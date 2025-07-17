@@ -3,248 +3,358 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Projects</title>
+    <title>My Portfolio Desktop</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.18.0/matter.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
+        /* Base styles and theme variables */
+        :root {
+            --bg-primary: #f0f4f8;
+            --bg-secondary: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --accent-color: #3b82f6;
+            --border-color: #e2e8f0;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+
+        /* Dark Theme */
+        .theme-dark {
+            --bg-primary: #1e293b;
+            --bg-secondary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-color: #60a5fa;
+            --border-color: #475569;
+            --shadow-color: rgba(0, 0, 0, 0.4);
+        }
+        
+        /* Serene Green Theme */
+        .theme-serene-green {
+            --bg-primary: #f0fdf4;
+            --bg-secondary: #ffffff;
+            --text-primary: #14532d;
+            --text-secondary: #16a34a;
+            --accent-color: #22c55e;
+            --border-color: #bbf7d0;
+        }
+        
+        /* Soothing Lavender Theme */
+        .theme-soothing-lavender {
+            --bg-primary: #f5f3ff;
+            --bg-secondary: #ffffff;
+            --text-primary: #4c1d95;
+            --text-secondary: #7c3aed;
+            --accent-color: #8b5cf6;
+            --border-color: #ddd6fe;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        #desktop {
+            position: relative;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
-            background-color: #111827;
-            color: #F9FAFB;
         }
-        #splash-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #111827;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            transition: opacity 1s ease-in-out;
-        }
-        #splash-content {
-            text-align: center;
-        }
-        #splash-content h1 {
-            font-size: 3rem;
-            font-weight: 700;
-            letter-spacing: 0.1em;
-            animation: fadeInText 2s ease-in-out;
-        }
-        @keyframes fadeInText {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        #render-canvas {
+
+        .desktop-icon {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-        }
-        .project-bubble {
-            position: absolute;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
             cursor: pointer;
             user-select: none;
-            transition: transform 0.2s ease-out, box-shadow 0.3s ease;
-            z-index: 10;
+            width: 90px;
+            text-align: center;
         }
-        .project-bubble:hover {
-            box-shadow: 0 0 25px 5px rgba(255, 255, 255, 0.2);
-            transform: scale(1.05);
+        .desktop-icon:hover .icon-label {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .window {
+            position: absolute;
+            min-width: 300px;
+            min-height: 200px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px -5px var(--shadow-color), 0 8px 10px -6px var(--shadow-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            resize: both; /* Fallback for browsers that support it */
+        }
+        
+        .window-titlebar {
+            height: 32px;
+            background-color: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            cursor: move;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 8px;
+            flex-shrink: 0;
+        }
+        
+        .window-content {
+            flex-grow: 1;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            right: 0;
+            bottom: 0;
+            cursor: se-resize;
+            background-image: linear-gradient(135deg, transparent 50%, var(--border-color) 50%);
+        }
+
+        .traffic-light {
+            width: 0.75rem; height: 0.75rem; border-radius: 9999px; cursor: pointer;
         }
     </style>
 </head>
-<body class="bg-gray-900">
+<body class="overflow-hidden">
 
-    <!-- Splash Screen -->
-    <div id="splash-screen">
-        <div id="splash-content">
-            <h1>WELCOME</h1>
+    <div class="flex h-screen w-screen">
+        <!-- Sidebar remains for settings -->
+        <nav class="w-16 p-2 flex flex-col bg-secondary border-r border-border-color transition-all duration-300 z-50">
+             <div class="flex items-center justify-center mb-10 mt-2">
+                 <svg class="h-8 w-8 text-accent-color" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 16v-2m8-6h2M4 12H2m15.364 6.364l1.414 1.414M4.222 4.222l1.414 1.414m12.728 0l-1.414 1.414M5.636 18.364l-1.414 1.414M12 16a4 4 0 110-8 4 4 0 010 8z" /></svg>
+            </div>
+            <div class="mt-auto mb-2">
+                <a href="#" id="settings-button" class="flex items-center justify-center p-3 rounded-lg text-text-secondary hover:bg-accent-color hover:text-white">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                </a>
+            </div>
+        </nav>
+
+        <!-- Main Desktop Area -->
+        <main id="desktop" class="flex-1 bg-bg-primary p-4">
+            <!-- Icons will be dynamically added here -->
+        </main>
+
+        <!-- Settings Panel -->
+        <div id="settings-panel" class="fixed top-0 right-0 h-full w-72 bg-bg-secondary shadow-lg p-6 border-l border-border-color transform translate-x-full z-50">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-text-primary">Settings</h2>
+                <button id="close-settings" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-slate-600">
+                     <svg class="h-6 w-6 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold mb-3 text-text-primary">Themes</h3>
+                <div class="space-y-2">
+                    <button onclick="changeTheme('')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Default Light</button>
+                    <button onclick="changeTheme('theme-dark')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Dark Mode</button>
+                    <button onclick="changeTheme('theme-serene-green')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Serene Green</button>
+                    <button onclick="changeTheme('theme-soothing-lavender')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Soothing Lavender</button>
+                </div>
+            </div>
         </div>
     </div>
-
-    <!-- Main Content -->
-    <div id="world"></div>
-    <div id="instructions" class="absolute bottom-5 left-1/2 -translate-x-1/2 text-gray-400 text-sm z-20 p-2 rounded-lg bg-gray-800/50 backdrop-blur-sm">
-        Click, drag, and play with the bubbles. Click a bubble's text to open the project.
-    </div>
-
+    
     <script>
+        // --- PROJECT CONFIGURATION ---
+        // Edit this object to add your projects.
+        // You can find new icons at https://heroicons.com/
+        const projects = {
+            "sudoku": { 
+                name: "Sudoku", 
+                url: "https://cdbyall.github.io/sudoku/",
+                icon: `<svg class="h-12 w-12 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>`
+            },
+            "solitaire": { 
+                name: "Solitaire", 
+                url: "https://cdbyall.github.io/solitaire",
+                icon: `<svg class="h-12 w-12 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75l3 3m0 0l3-3m-3 3v-7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
+            },
+            "hours": { 
+                name: "Hours For Shelby", 
+                url: "https://cdbyall.github.io/clock",
+                icon: `<svg class="h-12 w-12 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
+            },
+            "bam": {
+                name: "Bam Joard",
+                url: "https://cdbyall.github.io/clock/bam1",
+                icon: `<svg class="h-12 w-12 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9.75L16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" /></svg>`
+            }
+        };
+
         document.addEventListener('DOMContentLoaded', () => {
-            // --- Splash Screen Logic ---
-            const splashScreen = document.getElementById('splash-screen');
-            setTimeout(() => {
-                splashScreen.style.opacity = '0';
-                setTimeout(() => {
-                    splashScreen.style.display = 'none';
-                    // Start the synth sounds only after user interaction is likely
-                    Tone.start();
-                }, 1000);
-            }, 2500); // Splash screen duration
-
-            // --- Matter.js Setup ---
-            const { Engine, Render, Runner, World, Bodies, Mouse, MouseConstraint, Composite, Events } = Matter;
-
-            const worldContainer = document.getElementById('world');
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-
-            const engine = Engine.create({
-                gravity: { y: 0.1 } // A little bit of gravity to pull things down slowly
-            });
-            const world = engine.world;
-
-            const render = Render.create({
-                element: worldContainer,
-                engine: engine,
-                options: {
-                    width: width,
-                    height: height,
-                    wireframes: false, // We want to see our cool colors
-                    background: 'transparent'
-                }
-            });
-
-            Render.run(render);
-            const runner = Runner.create();
-            Runner.run(runner, engine);
-
-            // --- Sound Effects with Tone.js ---
-            const synth = new Tone.PolySynth(Tone.Synth, {
-                oscillator: { type: 'fmsine' },
-                envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.8 },
-                volume: -10
-            }).toDestination();
+            const desktop = document.getElementById('desktop');
+            let zIndexCounter = 10;
             
-            const notes = ["C3", "E3", "G3", "A3", "C4", "D4", "E4", "G4"];
+            // --- DESKTOP ICONS ---
+            Object.keys(projects).forEach((id, index) => {
+                const project = projects[id];
+                const iconEl = document.createElement('div');
+                iconEl.className = 'desktop-icon p-2';
+                iconEl.id = `icon-${id}`;
+                iconEl.style.top = `${20 + index * 110}px`;
+                iconEl.style.left = '20px';
+                iconEl.innerHTML = `
+                    <div class="icon-image flex justify-center">${project.icon}</div>
+                    <div class="icon-label text-sm text-text-primary rounded-md px-1 py-0.5 truncate">${project.name}</div>
+                `;
+                
+                iconEl.addEventListener('dblclick', () => createWindow(id));
+                makeDraggable(iconEl, iconEl);
+                desktop.appendChild(iconEl);
+            });
 
-            function playSound() {
-                if (Tone.context.state !== 'running') {
-                    Tone.context.resume();
+            // --- WINDOW MANAGER ---
+            function createWindow(projectId) {
+                const existingWindow = document.getElementById(`win-${projectId}`);
+                if (existingWindow) {
+                    focusWindow(existingWindow);
+                    return;
                 }
-                const note = notes[Math.floor(Math.random() * notes.length)];
-                synth.triggerAttackRelease(note, "8n");
+
+                const project = projects[projectId];
+                const win = document.createElement('div');
+                win.id = `win-${projectId}`;
+                win.className = 'window';
+                win.style.width = '720px';
+                win.style.height = '540px';
+                win.style.top = `${Math.random() * 100 + 50}px`;
+                win.style.left = `${Math.random() * 200 + 150}px`;
+                
+                win.innerHTML = `
+                    <div class="window-titlebar">
+                        <div class="flex items-center space-x-2">
+                            <button class="traffic-light bg-red-500" data-action="close"></button>
+                            <button class="traffic-light bg-yellow-500" data-action="minimize"></button>
+                            <button class="traffic-light bg-green-500" data-action="maximize"></button>
+                        </div>
+                        <span class="text-sm font-medium text-text-secondary">${project.name}</span>
+                        <div class="w-16"></div> <!-- Spacer -->
+                    </div>
+                    <div class="window-content">
+                        <iframe src="${project.url}" class="w-full h-full border-0"></iframe>
+                    </div>
+                    <div class="resize-handle"></div>
+                `;
+
+                desktop.appendChild(win);
+                focusWindow(win);
+                
+                const titlebar = win.querySelector('.window-titlebar');
+                makeDraggable(win, titlebar);
+                makeResizable(win);
+                
+                win.addEventListener('mousedown', () => focusWindow(win));
+
+                // Window controls
+                win.querySelector('[data-action="close"]').addEventListener('click', () => win.remove());
+                win.querySelector('[data-action="minimize"]').addEventListener('click', () => win.remove());
+                win.querySelector('[data-action="maximize"]').addEventListener('click', () => toggleMaximize(win));
             }
 
-            // --- Project Data ---
-            // IMPORTANT: Customize your projects here!
-            const projects = [
-                { name: 'Project One', url: '#', size: 100, color: 'bg-sky-500' },
-                { name: 'Project Two', url: '#', size: 80, color: 'bg-emerald-500' },
-                { name: 'Another Thing', url: '#', size: 120, color: 'bg-purple-500' },
-                { name: 'Cool App', url: '#', size: 90, color: 'bg-rose-500' },
-                { name: 'Website', url: '#', size: 110, color: 'bg-amber-500' },
-                { name: 'Interactive Art', url: '#', size: 70, color: 'bg-indigo-500' },
-            ];
+            function focusWindow(win) {
+                win.style.zIndex = ++zIndexCounter;
+            }
 
-            const bodies = [];
+            function toggleMaximize(win) {
+                if (win.dataset.maximized === 'true') {
+                    win.style.top = win.dataset.oldTop;
+                    win.style.left = win.dataset.oldLeft;
+                    win.style.width = win.dataset.oldWidth;
+                    win.style.height = win.dataset.oldHeight;
+                    delete win.dataset.maximized;
+                } else {
+                    win.dataset.oldTop = win.style.top;
+                    win.dataset.oldLeft = win.style.left;
+                    win.dataset.oldWidth = win.style.width;
+                    win.dataset.oldHeight = win.style.height;
+                    win.style.top = '0';
+                    win.style.left = '0';
+                    win.style.width = '100%';
+                    win.style.height = '100%';
+                    win.dataset.maximized = 'true';
+                }
+            }
+
+            // --- DRAGGABLE & RESIZABLE LOGIC ---
+            function makeDraggable(element, handle) {
+                let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+                handle.onmousedown = dragMouseDown;
+
+                function dragMouseDown(e) {
+                    e.preventDefault();
+                    pos3 = e.clientX;
+                    pos4 = e.clientY;
+                    document.onmouseup = closeDragElement;
+                    document.onmousemove = elementDrag;
+                    focusWindow(element.classList.contains('window') ? element : null);
+                }
+
+                function elementDrag(e) {
+                    e.preventDefault();
+                    pos1 = pos3 - e.clientX;
+                    pos2 = pos4 - e.clientY;
+                    pos3 = e.clientX;
+                    pos4 = e.clientY;
+                    element.style.top = (element.offsetTop - pos2) + "px";
+                    element.style.left = (element.offsetLeft - pos1) + "px";
+                }
+
+                function closeDragElement() {
+                    document.onmouseup = null;
+                    document.onmousemove = null;
+                }
+            }
             
-            // --- Create Bubbles and Physics Bodies ---
-            projects.forEach((project, index) => {
-                const isMobile = width < 768;
-                const size = isMobile ? project.size * 0.7 : project.size;
-                const x = Math.random() * (width - size) + size / 2;
-                const y = Math.random() * (height / 2); // Start in the top half
+            function makeResizable(element) {
+                const handle = element.querySelector('.resize-handle');
+                let original_width = 0, original_height = 0, original_x = 0, original_y = 0;
 
-                // Create the physics body
-                const body = Bodies.circle(x, y, size / 2, {
-                    restitution: 0.8, // Bounciness
-                    friction: 0.1,
-                    density: 0.001
-                });
+                handle.onmousedown = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation(); // Prevent titlebar drag
+                    original_width = parseFloat(getComputedStyle(element, null).getPropertyValue('width').replace('px', ''));
+                    original_height = parseFloat(getComputedStyle(element, null).getPropertyValue('height').replace('px', ''));
+                    original_x = e.pageX;
+                    original_y = e.pageY;
+                    window.onmousemove = resizeElement;
+                    window.onmouseup = stopResize;
+                }
+
+                function resizeElement(e) {
+                    const width = original_width + (e.pageX - original_x);
+                    const height = original_height + (e.pageY - original_y);
+                    element.style.width = width + 'px';
+                    element.style.height = height + 'px';
+                }
                 
-                body.label = 'project-bubble';
-                body.projectId = index;
-
-                // Create the HTML element
-                const div = document.createElement('a');
-                div.href = project.url;
-                div.className = `project-bubble ${project.color}`;
-                div.id = `bubble-${index}`;
-                div.style.width = `${size}px`;
-                div.style.height = `${size}px`;
-                div.innerHTML = `<span class="p-2 text-white font-semibold text-center">${project.name}</span>`;
-                worldContainer.appendChild(div);
-
-                // Prevent the physics body from rotating the HTML element
-                div.style.transformOrigin = 'center center';
-
-                bodies.push(body);
-            });
-
-            World.add(world, bodies);
-
-            // --- Walls ---
-            const wallOptions = { isStatic: true, render: { visible: false } };
-            World.add(world, [
-                Bodies.rectangle(width / 2, height + 50, width, 100, wallOptions), // Floor
-                Bodies.rectangle(width / 2, -50, width, 100, wallOptions),    // Ceiling
-                Bodies.rectangle(-50, height / 2, 100, height, wallOptions),   // Left wall
-                Bodies.rectangle(width + 50, height / 2, 100, height, wallOptions) // Right wall
-            ]);
-
-            // --- Mouse Interaction ---
-            const mouse = Mouse.create(render.canvas);
-            const mouseConstraint = MouseConstraint.create(engine, {
-                mouse: mouse,
-                constraint: {
-                    stiffness: 0.2,
-                    render: {
-                        visible: false
-                    }
+                function stopResize() {
+                    window.onmousemove = null;
+                    window.onmouseup = null;
                 }
-            });
+            }
 
-            World.add(world, mouseConstraint);
-            render.mouse = mouse;
-
-            // Play sound on collision
-            Events.on(engine, 'collisionStart', (event) => {
-                const pairs = event.pairs;
-                for (let i = 0; i < pairs.length; i++) {
-                    const pair = pairs[i];
-                    if (pair.bodyA.label === 'project-bubble' || pair.bodyB.label === 'project-bubble') {
-                         if (pair.collision.depth > 1) { // Only play for significant collisions
-                            playSound();
-                         }
-                    }
-                }
-            });
+            // --- SETTINGS PANEL ---
+            const settingsButton = document.getElementById('settings-button');
+            const closeSettingsButton = document.getElementById('close-settings');
+            const settingsPanel = document.getElementById('settings-panel');
+            settingsButton.addEventListener('click', (e) => { e.preventDefault(); settingsPanel.classList.remove('translate-x-full'); });
+            closeSettingsButton.addEventListener('click', () => { settingsPanel.classList.add('translate-x-full'); });
             
-            // --- Sync HTML elements with physics bodies ---
-            (function update() {
-                bodies.forEach((body, index) => {
-                    const div = document.getElementById(`bubble-${index}`);
-                    if (div) {
-                        // We position from the top-left corner, so adjust for the circle's radius
-                        div.style.left = `${body.position.x - div.offsetWidth / 2}px`;
-                        div.style.top = `${body.position.y - div.offsetHeight / 2}px`;
-                        // We don't update rotation to keep text readable
-                    }
-                });
-                requestAnimationFrame(update);
-            })();
-
-            // --- Window Resize ---
-            window.addEventListener('resize', () => {
-                // This is a simple reload to rescale. For a more complex app, you'd update positions.
-                location.reload(); 
-            });
+            // --- THEME LOGIC ---
+            window.changeTheme = function(themeClass) {
+                document.body.className = 'overflow-hidden';
+                if (themeClass) document.body.classList.add(themeClass);
+                localStorage.setItem('portfolioTheme', themeClass);
+            }
+            const savedTheme = localStorage.getItem('portfolioTheme') || '';
+            changeTheme(savedTheme);
         });
     </script>
-
 </body>
 </html>
