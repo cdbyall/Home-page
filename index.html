@@ -3,50 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Portfolio Desktop</title>
+    <title>itsgiving.life</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         /* Base styles and theme variables */
         :root {
-            --bg-primary: #f0f4f8;
+            --bg-primary: #f8fafc; /* slate-50 */
             --bg-secondary: #ffffff;
-            --text-primary: #1e293b;
-            --text-secondary: #475569;
-            --accent-color: #3b82f6;
-            --border-color: #e2e8f0;
-            --shadow-color: rgba(0, 0, 0, 0.1);
+            --text-primary: #0f172a; /* slate-900 */
+            --text-secondary: #64748b; /* slate-500 */
+            --accent-color: #3b82f6; /* blue-500 */
+            --accent-hover: #2563eb; /* blue-600 */
+            --border-color: #e2e8f0; /* slate-200 */
+            --animation-duration: 0.5s;
         }
 
-        /* Dark Theme */
+        /* --- THEMES --- */
         .theme-dark {
-            --bg-primary: #1e293b;
-            --bg-secondary: #334155;
-            --text-primary: #f1f5f9;
-            --text-secondary: #94a3b8;
-            --accent-color: #60a5fa;
-            --border-color: #475569;
-            --shadow-color: rgba(0, 0, 0, 0.4);
+            --bg-primary: #0f172a; --bg-secondary: #1e293b; --text-primary: #f1f5f9; --text-secondary: #94a3b8; --accent-color: #60a5fa; --accent-hover: #3b82f6; --border-color: #334155;
         }
-        
-        /* Serene Green Theme */
         .theme-serene-green {
-            --bg-primary: #f0fdf4;
-            --bg-secondary: #ffffff;
-            --text-primary: #14532d;
-            --text-secondary: #16a34a;
-            --accent-color: #22c55e;
-            --border-color: #bbf7d0;
+            --bg-primary: #f0fdf4; --bg-secondary: #ffffff; --text-primary: #14532d; --text-secondary: #16a34a; --accent-color: #22c55e; --accent-hover: #16a34a; --border-color: #bbf7d0;
         }
-        
-        /* Soothing Lavender Theme */
         .theme-soothing-lavender {
-            --bg-primary: #f5f3ff;
-            --bg-secondary: #ffffff;
-            --text-primary: #4c1d95;
-            --text-secondary: #7c3aed;
-            --accent-color: #8b5cf6;
-            --border-color: #ddd6fe;
+            --bg-primary: #f5f3ff; --bg-secondary: #ffffff; --text-primary: #4c1d95; --text-secondary: #7c3aed; --accent-color: #8b5cf6; --accent-hover: #7c3aed; --border-color: #ddd6fe;
+        }
+        .theme-sunset-orange {
+            --bg-primary: #fff7ed; --bg-secondary: #ffffff; --text-primary: #7c2d12; --text-secondary: #f97316; --accent-color: #fb923c; --accent-hover: #f97316; --border-color: #fed7aa;
+        }
+        .theme-ocean-deep {
+            --bg-primary: #ecfeff; --bg-secondary: #ffffff; --text-primary: #155e75; --text-secondary: #0891b2; --accent-color: #22d3ee; --accent-hover: #06b6d4; --border-color: #a5f3fc;
+        }
+        .theme-forest-walk {
+            --bg-primary: #f7fee7; --bg-secondary: #ffffff; --text-primary: #365314; --text-secondary: #65a30d; --accent-color: #84cc16; --accent-hover: #65a30d; --border-color: #d9f99d;
         }
 
         body {
@@ -56,117 +46,128 @@
             transition: background-color 0.3s ease, color 0.3s ease;
         }
         
-        #desktop {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
+        .content-area {
+            transition: opacity var(--animation-duration) ease;
         }
 
-        .desktop-icon {
-            position: absolute;
-            cursor: pointer;
-            user-select: none;
-            width: 90px;
-            text-align: center;
-        }
-        .desktop-icon:hover .icon-label {
+        .nav-link.active {
             background-color: var(--accent-color);
             color: white;
         }
-
-        .window {
-            position: absolute;
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+        .nav-link:not(.active):hover {
+            background-color: var(--border-color);
         }
-        
-        .window.is-mobile {
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            border-radius: 0;
-            box-shadow: none;
+        .theme-dark .nav-link:not(.active):hover {
+             background-color: #334155;
         }
 
-        .window:not(.is-mobile) {
-            min-width: 300px;
-            min-height: 200px;
-            border-radius: 0.75rem;
-            box-shadow: 0 10px 25px -5px var(--shadow-color), 0 8px 10px -6px var(--shadow-color);
-            resize: both;
+        /* Startup Animation */
+        #startup-overlay {
+            position: fixed; inset: 0; background-color: var(--bg-primary); z-index: 100; display: flex; align-items: center; justify-content: center; transition: opacity 0.5s ease;
         }
-        
-        .window-titlebar {
-            height: 32px;
-            background-color: var(--bg-primary);
-            border-bottom: 1px solid var(--border-color);
-            cursor: move;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 8px;
-            flex-shrink: 0;
+        #startup-overlay.hidden {
+            opacity: 0; pointer-events: none;
         }
-        
-        .window-content {
-            flex-grow: 1;
+        #startup-logo {
+            animation: pulse-fade 3s ease-in-out forwards;
+        }
+        @keyframes pulse-fade {
+            0% { opacity: 0; transform: scale(0.95); }
+            50% { opacity: 1; transform: scale(1.05); }
+            100% { opacity: 0; transform: scale(1); }
         }
 
-        .resize-handle {
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            right: 0;
-            bottom: 0;
-            cursor: se-resize;
-            background-image: linear-gradient(135deg, transparent 50%, var(--border-color) 50%);
-        }
-
-        .traffic-light {
-            width: 0.75rem; height: 0.75rem; border-radius: 9999px; cursor: pointer;
+        /* Focus Mode */
+        .focus-mode #welcome-message > svg,
+        .focus-mode #welcome-message > p {
+            display: none;
         }
     </style>
 </head>
 <body class="overflow-hidden">
 
-    <div class="flex h-screen w-screen">
-        <!-- Sidebar remains for settings -->
-        <nav class="w-16 p-2 flex flex-col bg-secondary border-r border-border-color transition-all duration-300 z-50">
-             <div class="flex items-center justify-center mb-10 mt-2">
-                 <svg class="h-8 w-8 text-accent-color" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 16v-2m8-6h2M4 12H2m15.364 6.364l1.414 1.414M4.222 4.222l1.414 1.414m12.728 0l-1.414 1.414M5.636 18.364l-1.414 1.414M12 16a4 4 0 110-8 4 4 0 010 8z" /></svg>
+    <!-- Startup Animation Overlay -->
+    <div id="startup-overlay">
+        <div id="startup-logo">
+            <svg class="h-24 w-24 text-accent-color" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6.878V6a2.25 2.25 0 012.25-2.25h7.5A2.25 2.25 0 0118 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 004.5 9v.878m13.5-3A2.25 2.25 0 0119.5 9v.878m0 0a2.246 2.246 0 00-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0121 12v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6c0-.98.626-1.813 1.5-2.122" /></svg>
+        </div>
+    </div>
+
+    <div class="flex h-screen w-screen bg-bg-primary">
+        <!-- Sidebar Navigation -->
+        <nav class="w-20 lg:w-64 p-4 flex flex-col bg-bg-secondary border-r border-border-color transition-all duration-300 z-20">
+             <div class="flex items-center justify-center lg:justify-start mb-12 shrink-0">
+                 <svg class="h-10 w-10 text-accent-color" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6.878V6a2.25 2.25 0 012.25-2.25h7.5A2.25 2.25 0 0118 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 004.5 9v.878m13.5-3A2.25 2.25 0 0119.5 9v.878m0 0a2.246 2.246 0 00-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0121 12v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6c0-.98.626-1.813 1.5-2.122" /></svg>
+                <span class="hidden lg:inline ml-3 text-xl font-bold text-text-primary">Projects</span>
             </div>
-            <div class="mt-auto mb-2">
-                <a href="#" id="settings-button" class="flex items-center justify-center p-3 rounded-lg text-text-secondary hover:bg-accent-color hover:text-white">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            <ul id="nav-list" class="flex flex-col space-y-3">
+                <!-- Projects will be dynamically added here -->
+            </ul>
+            <div class="mt-auto">
+                <a href="#" id="settings-button" class="nav-link flex items-center justify-center lg:justify-start p-3 rounded-lg text-text-secondary transition-colors duration-200">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <span class="hidden lg:inline ml-4 font-medium">Settings</span>
                 </a>
             </div>
         </nav>
 
-        <!-- Main Desktop Area -->
-        <main id="desktop" class="flex-1 bg-bg-primary p-4">
-            <!-- Icons will be dynamically added here -->
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col p-4 md:p-6 lg:p-8 overflow-y-auto">
+            <div id="header" class="flex items-center justify-between mb-6">
+                <h1 id="project-title" class="text-3xl font-bold text-text-primary">Welcome</h1>
+                <button id="close-iframe-btn" class="hidden items-center gap-2 px-4 py-2 bg-accent-color text-white rounded-lg shadow-sm hover:bg-accent-hover transition-colors">
+                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    <span>Close</span>
+                </button>
+            </div>
+            
+            <div id="content-container" class="flex-1 bg-bg-secondary rounded-xl shadow-sm border border-border-color relative">
+                <div id="welcome-message" class="content-area flex flex-col items-center justify-center h-full text-center p-8">
+                    <svg class="h-24 w-24 text-accent-color opacity-50 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" /></svg>
+                    <h2 class="text-2xl font-bold text-text-primary mb-2">itsgiving.life</h2>
+                    <p class="text-lg text-text-secondary max-w-md">Please select a project from the navigation menu on the left to view it here.</p>
+                </div>
+                <div id="iframe-wrapper" class="content-area opacity-0 absolute inset-0 w-full h-full pointer-events-none">
+                    <iframe id="project-iframe" class="w-full h-full border-0 rounded-xl" allow="fullscreen"></iframe>
+                </div>
+            </div>
         </main>
 
         <!-- Settings Panel -->
-        <div id="settings-panel" class="fixed top-0 right-0 h-full w-72 bg-bg-secondary shadow-lg p-6 border-l border-border-color transform translate-x-full z-50">
-            <div class="flex justify-between items-center mb-6">
+        <div id="settings-panel" class="fixed top-0 right-0 h-full w-72 bg-bg-secondary shadow-lg p-6 border-l border-border-color transform translate-x-full z-30 transition-transform duration-300 overflow-y-auto">
+             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold text-text-primary">Settings</h2>
                 <button id="close-settings" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-slate-600">
                      <svg class="h-6 w-6 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
-            <div>
-                <h3 class="text-lg font-semibold mb-3 text-text-primary">Themes</h3>
-                <div class="space-y-2">
-                    <button onclick="changeTheme('')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Default Light</button>
-                    <button onclick="changeTheme('theme-dark')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Dark Mode</button>
-                    <button onclick="changeTheme('theme-serene-green')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Serene Green</button>
-                    <button onclick="changeTheme('theme-soothing-lavender')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Soothing Lavender</button>
+            <div class="space-y-6">
+                <div>
+                    <h3 class="text-lg font-semibold mb-3 text-text-primary">Themes</h3>
+                    <div class="space-y-2">
+                        <button onclick="changeTheme('')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Default Light</button>
+                        <button onclick="changeTheme('theme-dark')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Dark Mode</button>
+                        <button onclick="changeTheme('theme-serene-green')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Serene Green</button>
+                        <button onclick="changeTheme('theme-soothing-lavender')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Soothing Lavender</button>
+                        <button onclick="changeTheme('theme-sunset-orange')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Sunset Orange</button>
+                        <button onclick="changeTheme('theme-ocean-deep')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Ocean Deep</button>
+                        <button onclick="changeTheme('theme-forest-walk')" class="w-full text-left p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">Forest Walk</button>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold mb-3 text-text-primary">Animation Speed</h3>
+                    <div id="animation-speed-options" class="space-y-2">
+                        <label class="flex items-center gap-2"><input type="radio" name="anim-speed" value="0.5s"> Normal</label>
+                        <label class="flex items-center gap-2"><input type="radio" name="anim-speed" value="1s"> Relaxed</label>
+                        <label class="flex items-center gap-2"><input type="radio" name="anim-speed" value="0s"> Instant</label>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold mb-3 text-text-primary">Interface</h3>
+                    <label class="flex items-center justify-between">
+                        <span>Focus Mode</span>
+                        <input type="checkbox" id="focus-mode-toggle" class="h-4 w-4 rounded text-accent-color">
+                    </label>
                 </div>
             </div>
         </div>
@@ -178,195 +179,94 @@
             "sudoku": { 
                 name: "Sudoku", 
                 url: "https://cdbyall.github.io/sudoku/",
-                icon: `<svg class="h-12 w-12 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>`
+                icon: `<svg class="h-6 w-6" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4h4v4h-4z" /><path d="M4 10h4v4h-4z" /><path d="M4 16h4v4h-4z" /><path d="M10 4h4v4h-4z" /><path d="M10 10h4v4h-4z" /><path d="M10 16h4v4h-4z" /><path d="M16 4h4v4h-4z" /><path d="M16 10h4v4h-4z" /><path d="M16 16h4v4h-4z" /></svg>`
             },
             "solitaire": { 
                 name: "Solitaire", 
                 url: "https://cdbyall.github.io/solitaire",
-                icon: `<svg class="h-12 w-12 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75l3 3m0 0l3-3m-3 3v-7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
+                icon: `<svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><path d="M18.26 10.327c-1.235-2.34-3.852-3.615-6.26-3.615s-5.025 1.275-6.26 3.615c-2.34 4.455 2.145 10.815 6.26 10.815s8.6-6.36 6.26-10.815z"/></svg>`
             },
             "hours": { 
                 name: "Hours For Shelby", 
                 url: "https://cdbyall.github.io/clock",
-                icon: `<svg class="h-12 w-12 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
+                icon: `<svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
             },
             "bam": {
                 name: "Bam Joard",
                 url: "https://cdbyall.github.io/clock/bam1",
-                icon: `<svg class="h-12 w-12 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9.75L16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" /></svg>`
+                icon: `<svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM18 13.5a3.375 3.375 0 00-3.375-3.375L18 13.5m0 0L19.035 12a3.375 3.375 0 002.455-2.456L21.75 9l-1.035-.259a3.375 3.375 0 00-2.456-2.456L18 5.25l-.259 1.035a3.375 3.375 0 00-2.456 2.456L14.25 9l1.035.259a3.375 3.375 0 002.456 2.456L18 13.5z" /></svg>`
             }
         };
 
         document.addEventListener('DOMContentLoaded', () => {
-            const desktop = document.getElementById('desktop');
-            let zIndexCounter = 10;
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const startupOverlay = document.getElementById('startup-overlay');
+            const navList = document.getElementById('nav-list');
+            const projectTitle = document.getElementById('project-title');
+            const welcomeMessage = document.getElementById('welcome-message');
+            const iframeWrapper = document.getElementById('iframe-wrapper');
+            const projectIframe = document.getElementById('project-iframe');
+            const closeIframeBtn = document.getElementById('close-iframe-btn');
 
-            // --- DESKTOP ICONS ---
-            Object.keys(projects).forEach((id, index) => {
-                const project = projects[id];
-                const iconEl = document.createElement('div');
-                iconEl.className = 'desktop-icon p-2';
-                iconEl.id = `icon-${id}`;
-                iconEl.style.top = `${20 + index * 110}px`;
-                iconEl.style.left = '20px';
-                iconEl.innerHTML = `
-                    <div class="icon-image flex justify-center">${project.icon}</div>
-                    <div class="icon-label text-sm text-text-primary rounded-md px-1 py-0.5 truncate">${project.name}</div>
-                `;
-                
-                // Use single tap for mobile, double click for desktop
-                const eventType = isMobile ? 'click' : 'dblclick';
-                iconEl.addEventListener(eventType, () => createWindow(id));
-                
-                // Only allow dragging on desktop
-                if (!isMobile) {
-                    makeDraggable(iconEl, iconEl);
-                }
-                
-                desktop.appendChild(iconEl);
-            });
-
-            // --- WINDOW MANAGER ---
-            function createWindow(projectId) {
-                const existingWindow = document.getElementById(`win-${projectId}`);
-                if (existingWindow) {
-                    focusWindow(existingWindow);
-                    return;
-                }
-
-                const project = projects[projectId];
-                const win = document.createElement('div');
-                win.id = `win-${projectId}`;
-                win.className = 'window';
-                if (isMobile) {
-                    win.classList.add('is-mobile');
-                } else {
-                    win.style.width = '720px';
-                    win.style.height = '540px';
-                    win.style.top = `${Math.random() * 100 + 50}px`;
-                    win.style.left = `${Math.random() * 200 + 150}px`;
-                }
-                
-                win.innerHTML = `
-                    <div class="window-titlebar">
-                        <div class="flex items-center space-x-2">
-                            <button class="traffic-light bg-red-500" data-action="close"></button>
-                            <button class="traffic-light bg-yellow-500" data-action="minimize"></button>
-                            <button class="traffic-light bg-green-500" data-action="maximize"></button>
-                        </div>
-                        <span class="text-sm font-medium text-text-secondary">${project.name}</span>
-                        <div class="w-16"></div> <!-- Spacer -->
-                    </div>
-                    <div class="window-content">
-                        <iframe src="${project.url}" class="w-full h-full border-0"></iframe>
-                    </div>
-                    ${!isMobile ? '<div class="resize-handle"></div>' : ''}
-                `;
-
-                desktop.appendChild(win);
-                focusWindow(win);
-                
-                if (!isMobile) {
-                    const titlebar = win.querySelector('.window-titlebar');
-                    makeDraggable(win, titlebar);
-                    makeResizable(win);
-                }
-                
-                win.addEventListener('mousedown', () => focusWindow(win));
-
-                // Window controls
-                win.querySelector('[data-action="close"]').addEventListener('click', () => win.remove());
-                win.querySelector('[data-action="minimize"]').addEventListener('click', () => win.remove());
-                win.querySelector('[data-action="maximize"]').addEventListener('click', () => {
-                    if (!isMobile) toggleMaximize(win);
+            // --- STARTUP ANIMATION LOGIC ---
+            if (sessionStorage.getItem('hasVisited')) {
+                startupOverlay.classList.add('hidden');
+            } else {
+                const logo = document.getElementById('startup-logo');
+                logo.addEventListener('animationend', () => {
+                    startupOverlay.classList.add('hidden');
+                    sessionStorage.setItem('hasVisited', 'true');
                 });
             }
-
-            function focusWindow(win) {
-                win.style.zIndex = ++zIndexCounter;
-            }
-
-            function toggleMaximize(win) {
-                if (win.dataset.maximized === 'true') {
-                    win.style.top = win.dataset.oldTop;
-                    win.style.left = win.dataset.oldLeft;
-                    win.style.width = win.dataset.oldWidth;
-                    win.style.height = win.dataset.oldHeight;
-                    delete win.dataset.maximized;
-                } else {
-                    win.dataset.oldTop = win.style.top;
-                    win.dataset.oldLeft = win.style.left;
-                    win.dataset.oldWidth = win.style.width;
-                    win.dataset.oldHeight = win.style.height;
-                    win.style.top = '0';
-                    win.style.left = '0';
-                    win.style.width = '100%';
-                    win.style.height = '100%';
-                    win.dataset.maximized = 'true';
-                }
-            }
-
-            // --- DRAGGABLE & RESIZABLE LOGIC ---
-            function makeDraggable(element, handle) {
-                let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-                handle.onmousedown = dragMouseDown;
-
-                function dragMouseDown(e) {
-                    e.preventDefault();
-                    pos3 = e.clientX;
-                    pos4 = e.clientY;
-                    document.onmouseup = closeDragElement;
-                    document.onmousemove = elementDrag;
-                    focusWindow(element.classList.contains('window') ? element : null);
-                }
-
-                function elementDrag(e) {
-                    e.preventDefault();
-                    pos1 = pos3 - e.clientX;
-                    pos2 = pos4 - e.clientY;
-                    pos3 = e.clientX;
-                    pos4 = e.clientY;
-                    element.style.top = (element.offsetTop - pos2) + "px";
-                    element.style.left = (element.offsetLeft - pos1) + "px";
-                }
-
-                function closeDragElement() {
-                    document.onmouseup = null;
-                    document.onmousemove = null;
-                }
-            }
             
-            function makeResizable(element) {
-                const handle = element.querySelector('.resize-handle');
-                if (!handle) return;
-                let original_width = 0, original_height = 0, original_x = 0, original_y = 0;
+            // Populate navigation
+            Object.keys(projects).forEach(id => {
+                const project = projects[id];
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <a href="#" class="nav-link flex items-center justify-center lg:justify-start p-3 rounded-lg text-text-secondary transition-colors duration-200" data-project-id="${id}">
+                        ${project.icon}
+                        <span class="hidden lg:inline ml-4 font-medium">${project.name}</span>
+                    </a>`;
+                navList.appendChild(li);
+            });
 
-                handle.onmousedown = function(e) {
+            // Handle navigation clicks
+            navList.addEventListener('click', (e) => {
+                const link = e.target.closest('a');
+                if (link && link.dataset.projectId) {
                     e.preventDefault();
-                    e.stopPropagation();
-                    original_width = parseFloat(getComputedStyle(element, null).getPropertyValue('width').replace('px', ''));
-                    original_height = parseFloat(getComputedStyle(element, null).getPropertyValue('height').replace('px', ''));
-                    original_x = e.pageX;
-                    original_y = e.pageY;
-                    window.onmousemove = resizeElement;
-                    window.onmouseup = stopResize;
+                    const projectId = link.dataset.projectId;
+                    const project = projects[projectId];
+                    
+                    document.querySelectorAll('#nav-list a').forEach(a => a.classList.remove('active'));
+                    link.classList.add('active');
+                    projectTitle.textContent = project.name;
+                    closeIframeBtn.classList.remove('hidden');
+                    closeIframeBtn.classList.add('flex');
+                    
+                    welcomeMessage.style.opacity = '0';
+                    welcomeMessage.style.pointerEvents = 'none';
+                    iframeWrapper.style.opacity = '1';
+                    iframeWrapper.style.pointerEvents = 'auto';
+                    projectIframe.src = project.url;
                 }
+            });
 
-                function resizeElement(e) {
-                    const width = original_width + (e.pageX - original_x);
-                    const height = original_height + (e.pageY - original_y);
-                    element.style.width = width + 'px';
-                    element.style.height = height + 'px';
-                }
-                
-                function stopResize() {
-                    window.onmousemove = null;
-                    window.onmouseup = null;
-                }
-            }
+            // Handle close button click
+            closeIframeBtn.addEventListener('click', () => {
+                document.querySelectorAll('#nav-list a').forEach(a => a.classList.remove('active'));
+                projectTitle.textContent = 'Welcome';
+                closeIframeBtn.classList.add('hidden');
+                closeIframeBtn.classList.remove('flex');
 
-            // --- SETTINGS PANEL ---
+                iframeWrapper.style.opacity = '0';
+                iframeWrapper.style.pointerEvents = 'none';
+                projectIframe.src = 'about:blank';
+                welcomeMessage.style.opacity = '1';
+                welcomeMessage.style.pointerEvents = 'auto';
+            });
+
+            // --- SETTINGS PANEL LOGIC ---
             const settingsButton = document.getElementById('settings-button');
             const closeSettingsButton = document.getElementById('close-settings');
             const settingsPanel = document.getElementById('settings-panel');
@@ -379,8 +279,35 @@
                 if (themeClass) document.body.classList.add(themeClass);
                 localStorage.setItem('portfolioTheme', themeClass);
             }
+            
+            // --- ANIMATION SPEED LOGIC ---
+            const animationSpeedOptions = document.getElementById('animation-speed-options');
+            animationSpeedOptions.addEventListener('change', (e) => {
+                if (e.target.name === 'anim-speed') {
+                    document.documentElement.style.setProperty('--animation-duration', e.target.value);
+                    localStorage.setItem('animationSpeed', e.target.value);
+                }
+            });
+
+            // --- FOCUS MODE LOGIC ---
+            const focusModeToggle = document.getElementById('focus-mode-toggle');
+            focusModeToggle.addEventListener('change', (e) => {
+                document.body.classList.toggle('focus-mode', e.target.checked);
+                localStorage.setItem('focusMode', e.target.checked);
+            });
+
+            // --- LOAD SAVED SETTINGS ---
             const savedTheme = localStorage.getItem('portfolioTheme') || '';
+            const savedSpeed = localStorage.getItem('animationSpeed') || '0.5s';
+            const savedFocus = localStorage.getItem('focusMode') === 'true';
+
             changeTheme(savedTheme);
+            
+            document.documentElement.style.setProperty('--animation-duration', savedSpeed);
+            document.querySelector(`input[name="anim-speed"][value="${savedSpeed}"]`).checked = true;
+
+            document.body.classList.toggle('focus-mode', savedFocus);
+            focusModeToggle.checked = savedFocus;
         });
     </script>
 </body>
