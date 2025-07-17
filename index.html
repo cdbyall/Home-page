@@ -77,16 +77,28 @@
 
         .window {
             position: absolute;
-            min-width: 300px;
-            min-height: 200px;
             background-color: var(--bg-secondary);
             border: 1px solid var(--border-color);
-            border-radius: 0.75rem;
-            box-shadow: 0 10px 25px -5px var(--shadow-color), 0 8px 10px -6px var(--shadow-color);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            resize: both; /* Fallback for browsers that support it */
+        }
+        
+        .window.is-mobile {
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        .window:not(.is-mobile) {
+            min-width: 300px;
+            min-height: 200px;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px -5px var(--shadow-color), 0 8px 10px -6px var(--shadow-color);
+            resize: both;
         }
         
         .window-titlebar {
@@ -162,8 +174,6 @@
     
     <script>
         // --- PROJECT CONFIGURATION ---
-        // Edit this object to add your projects.
-        // You can find new icons at https://heroicons.com/
         const projects = {
             "sudoku": { 
                 name: "Sudoku", 
@@ -190,7 +200,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             const desktop = document.getElementById('desktop');
             let zIndexCounter = 10;
-            
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
             // --- DESKTOP ICONS ---
             Object.keys(projects).forEach((id, index) => {
                 const project = projects[id];
@@ -204,8 +215,15 @@
                     <div class="icon-label text-sm text-text-primary rounded-md px-1 py-0.5 truncate">${project.name}</div>
                 `;
                 
-                iconEl.addEventListener('dblclick', () => createWindow(id));
-                makeDraggable(iconEl, iconEl);
+                // Use single tap for mobile, double click for desktop
+                const eventType = isMobile ? 'click' : 'dblclick';
+                iconEl.addEventListener(eventType, () => createWindow(id));
+                
+                // Only allow dragging on desktop
+                if (!isMobile) {
+                    makeDraggable(iconEl, iconEl);
+                }
+                
                 desktop.appendChild(iconEl);
             });
 
@@ -221,10 +239,14 @@
                 const win = document.createElement('div');
                 win.id = `win-${projectId}`;
                 win.className = 'window';
-                win.style.width = '720px';
-                win.style.height = '540px';
-                win.style.top = `${Math.random() * 100 + 50}px`;
-                win.style.left = `${Math.random() * 200 + 150}px`;
+                if (isMobile) {
+                    win.classList.add('is-mobile');
+                } else {
+                    win.style.width = '720px';
+                    win.style.height = '540px';
+                    win.style.top = `${Math.random() * 100 + 50}px`;
+                    win.style.left = `${Math.random() * 200 + 150}px`;
+                }
                 
                 win.innerHTML = `
                     <div class="window-titlebar">
@@ -239,22 +261,26 @@
                     <div class="window-content">
                         <iframe src="${project.url}" class="w-full h-full border-0"></iframe>
                     </div>
-                    <div class="resize-handle"></div>
+                    ${!isMobile ? '<div class="resize-handle"></div>' : ''}
                 `;
 
                 desktop.appendChild(win);
                 focusWindow(win);
                 
-                const titlebar = win.querySelector('.window-titlebar');
-                makeDraggable(win, titlebar);
-                makeResizable(win);
+                if (!isMobile) {
+                    const titlebar = win.querySelector('.window-titlebar');
+                    makeDraggable(win, titlebar);
+                    makeResizable(win);
+                }
                 
                 win.addEventListener('mousedown', () => focusWindow(win));
 
                 // Window controls
                 win.querySelector('[data-action="close"]').addEventListener('click', () => win.remove());
                 win.querySelector('[data-action="minimize"]').addEventListener('click', () => win.remove());
-                win.querySelector('[data-action="maximize"]').addEventListener('click', () => toggleMaximize(win));
+                win.querySelector('[data-action="maximize"]').addEventListener('click', () => {
+                    if (!isMobile) toggleMaximize(win);
+                });
             }
 
             function focusWindow(win) {
@@ -313,11 +339,12 @@
             
             function makeResizable(element) {
                 const handle = element.querySelector('.resize-handle');
+                if (!handle) return;
                 let original_width = 0, original_height = 0, original_x = 0, original_y = 0;
 
                 handle.onmousedown = function(e) {
                     e.preventDefault();
-                    e.stopPropagation(); // Prevent titlebar drag
+                    e.stopPropagation();
                     original_width = parseFloat(getComputedStyle(element, null).getPropertyValue('width').replace('px', ''));
                     original_height = parseFloat(getComputedStyle(element, null).getPropertyValue('height').replace('px', ''));
                     original_x = e.pageX;
