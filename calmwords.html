@@ -68,6 +68,17 @@
         .keyboard-key.present { background-color: #c9b458; color: white; }
         .keyboard-key.absent { background-color: #787c7e; color: white; }
         
+        /* Wiggle animation for invalid words */
+        @keyframes shake {
+            10%, 90% { transform: translateX(-1px); }
+            20%, 80% { transform: translateX(2px); }
+            30%, 50%, 70% { transform: translateX(-4px); }
+            40%, 60% { transform: translateX(4px); }
+        }
+        .tile.shake {
+            animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
         /* Modal Animation */
         .modal-content {
             transition: transform 0.3s ease-out, opacity 0.3s ease-out;
@@ -257,6 +268,11 @@
                     gameState = data.state;
                     render();
                 } else if (data.type === 'guess' && isHost) {
+                    // Host validates the word again as a security measure
+                    if (!WORDS.includes(data.guess.toLowerCase())) {
+                        // In a real-world scenario, you might notify the host, but here we'll just ignore it.
+                        return;
+                    }
                     gameState.grid[gameState.currentRow] = data.guess.split('');
                     processGuess(data.guess);
                 }
@@ -346,8 +362,32 @@
             }
         }
 
+        function shakeCurrentRow() {
+            const currentRowEl = gameBoard.children[gameState.currentRow];
+            if (!currentRowEl) return;
+            
+            currentRowEl.childNodes.forEach(tile => {
+                tile.classList.add('shake');
+            });
+
+            // Remove the class after the animation completes so it can be re-triggered
+            setTimeout(() => {
+                currentRowEl.childNodes.forEach(tile => {
+                    tile.classList.remove('shake');
+                });
+            }, 600); // Must match the animation duration in CSS
+        }
+
         function submitGuess() {
             const guess = gameState.grid[gameState.currentRow].join('');
+
+            // Check if the word is in the list before submitting
+            if (!WORDS.includes(guess.toLowerCase())) {
+                showToast("Not in word list");
+                shakeCurrentRow();
+                return; // Stop the function here
+            }
+
             if (isHost) {
                 processGuess(guess);
             } else {
