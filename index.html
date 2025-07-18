@@ -3,242 +3,251 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portfolio</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Caveat&display=swap" rel="stylesheet">
+    <title>itsgiving.life - OS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        /* --- General Setup --- */
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #0c001f; /* A deep, calming space-purple */
-            font-family: 'Orbitron', sans-serif; /* A futuristic font for project names */
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        :root {
+            --bg-primary: #f8fafc; --bg-secondary: #ffffff; --text-primary: #0f172a; --text-secondary: #64748b; --accent-color: #3b82f6; --accent-hover: #2563eb; --border-color: #e2e8f0; --shadow-color: rgba(0, 0, 0, 0.1); --taskbar-bg: rgba(255, 255, 255, 0.7);
         }
+        .theme-dark { --bg-primary: #0f172a; --bg-secondary: #1e293b; --text-primary: #f1f5f9; --text-secondary: #94a3b8; --accent-color: #60a5fa; --accent-hover: #3b82f6; --border-color: #334155; --shadow-color: rgba(0, 0, 0, 0.4); --taskbar-bg: rgba(30, 41, 59, 0.7); }
+        .theme-serene-green { --bg-primary: #f0fdf4; --bg-secondary: #ffffff; --text-primary: #14532d; --text-secondary: #16a34a; --accent-color: #22c55e; --accent-hover: #16a34a; --border-color: #bbf7d0; --taskbar-bg: rgba(240, 253, 244, 0.7); }
+        .theme-soothing-lavender { --bg-primary: #f5f3ff; --bg-secondary: #ffffff; --text-primary: #4c1d95; --text-secondary: #7c3aed; --accent-color: #8b5cf6; --accent-hover: #7c3aed; --border-color: #ddd6fe; --taskbar-bg: rgba(245, 243, 255, 0.7); }
+        .theme-sunset-orange { --bg-primary: #fff7ed; --bg-secondary: #ffffff; --text-primary: #7c2d12; --text-secondary: #f97316; --accent-color: #fb923c; --accent-hover: #f97316; --border-color: #fed7aa; --taskbar-bg: rgba(255, 247, 237, 0.7); }
+        .theme-ocean-deep { --bg-primary: #ecfeff; --bg-secondary: #ffffff; --text-primary: #155e75; --text-secondary: #0891b2; --accent-color: #22d3ee; --accent-hover: #06b6d4; --border-color: #a5f3fc; --taskbar-bg: rgba(236, 254, 255, 0.7); }
+        .theme-forest-walk { --bg-primary: #f7fee7; --bg-secondary: #ffffff; --text-primary: #365314; --text-secondary: #65a30d; --accent-color: #84cc16; --accent-hover: #65a30d; --border-color: #d9f99d; --taskbar-bg: rgba(247, 254, 231, 0.7); }
 
-        .scene-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            perspective: 1000px; /* Enables 3D transformations for child elements */
-        }
-
-        /* --- Spacetime Background --- */
-        .spacetime-grid {
-            position: absolute;
-            width: 300vw;
-            height: 300vh;
-            /* Creates the grid lines with a semi-transparent, calming color */
-            background-image:
-                linear-gradient(rgba(118, 75, 224, 0.2) 2px, transparent 2px),
-                linear-gradient(90deg, rgba(118, 75, 224, 0.2) 2px, transparent 2px);
-            background-size: 80px 80px;
-            /* Tilts the grid on its X-axis to give a sense of perspective */
-            transform: rotateX(75deg);
-            /* A very slow, soothing animation to make the space feel alive */
-            animation: slow-pan 120s linear infinite;
-            z-index: 1;
-        }
-
-        /* The gravitational "dent" in spacetime caused by the sun */
-        .spacetime-grid::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 600px;
-            height: 600px;
-            /* A radial gradient creates the shadow effect of a depression */
-            background: radial-gradient(circle, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0) 70%);
-            border-radius: 50%;
-        }
-
-        @keyframes slow-pan {
-            0% { background-position: 0 0; }
-            100% { background-position: 1920px 1080px; } /* Pans the background slowly */
-        }
-
-        /* --- Central Sun & Orbit System --- */
-        .sun-container {
-            position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10;
-        }
-
-        .sun-button {
-            width: 220px;
-            height: 220px;
-            border-radius: 50%;
-            /* A multi-layered gradient gives the sun a fiery, 3D look */
-            background: radial-gradient(ellipse at center, #ffee99 0%, #ffd700 50%, #ff8c00 100%);
-            /* Outer glow and inner highlight for a sense of volume and light */
-            box-shadow:
-                0 0 40px #ffd700,
-                0 0 80px #ff8c00,
-                inset 0 0 30px #ffffffaa;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            color: #4d2f00;
-            font-family: 'Caveat', cursive; /* The handwriting font from your original design */
-            font-size: 26px;
-            font-weight: bold;
-            line-height: 1.2;
-            cursor: pointer;
-            animation:
-                slow-spin 45s linear infinite,
-                pulse 4s ease-in-out infinite;
-            transition: transform 0.5s ease-in-out;
-        }
-
-        .sun-button:hover {
-            transform: scale(1.05); /* Slight zoom on hover */
-        }
-
-        @keyframes slow-spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 0 40px #ffd700, 0 0 80px #ff8c00, inset 0 0 30px #ffffffaa; }
-            50% { box-shadow: 0 0 50px #ffee99, 0 0 100px #ff8c00, inset 0 0 30px #ffffffaa; }
-            100% { box-shadow: 0 0 40px #ffd700, 0 0 80px #ff8c00, inset 0 0 30px #ffffffaa; }
-        }
-
-        /* --- Project Planets --- */
-        .project-orbit {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 1px;
-            height: 1px;
-            pointer-events: none; /* Allows clicks to go through to the sun when orbit is closed */
-            transition: transform 1s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* A fun, physics-like transition */
-        }
-
-        /* When the sun is clicked, this class is added, triggering animations */
-        .sun-container.is-open .project-orbit {
-            transform: rotate(360deg); /* Spins the whole orbit system for a cool effect */
-            pointer-events: auto; /* Re-enables clicks on the planets */
-        }
-
-        .project-planet {
-            position: absolute;
-            width: 80px;
-            height: 80px;
-            /* A calm blue gradient for the planets */
-            background: radial-gradient(circle at 30% 30%, #eef2f9, #a8b8d0);
-            border-radius: 50%;
-            /* A subtle glow and an inner shadow to give depth */
-            box-shadow: 0 0 15px rgba(173, 216, 230, 0.7), inset -10px -10px 20px rgba(0,0,0,0.3);
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-decoration: none;
-            color: #0c001f;
-            font-size: 14px;
-            font-weight: bold;
-            text-align: center;
-            opacity: 0;
-            /* Start planets at the center and scaled down */
-            transform: translate(-50%, -50%) scale(0);
-            /* Defines the animation for emerging */
-            transition: all 0.8s ease-out;
-        }
-
-        /* The animation trigger for the planets */
-        .sun-container.is-open .project-planet {
-            opacity: 1;
-            /* The final position is set by the --transform-end variable from JS */
-            transform: var(--transform-end) scale(1);
-        }
-
-        .project-planet:hover {
-            box-shadow: 0 0 25px rgba(255, 255, 255, 1), inset -10px -10px 20px rgba(0,0,0,0.3);
-            /* We use !important to ensure the hover scale works even after the open animation */
-            transform: var(--transform-end) scale(1.1) !important;
-        }
-
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); }
+        #desktop { position: relative; width: 100%; height: 100%; overflow: hidden; }
+        .desktop-icon { position: absolute; cursor: pointer; user-select: none; width: 90px; text-align: center; padding: 0.5rem; }
+        .desktop-icon:hover .icon-label { background-color: var(--accent-color); color: white; }
+        .window { position: absolute; min-width: 300px; min-height: 200px; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 0.5rem; box-shadow: 0 10px 25px -5px var(--shadow-color); display: flex; flex-direction: column; overflow: hidden; }
+        .window-titlebar { height: 32px; background-color: var(--bg-primary); border-bottom: 1px solid var(--border-color); cursor: move; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; flex-shrink: 0; }
+        .window-content { flex-grow: 1; overflow: auto; }
+        .resize-handle { position: absolute; width: 16px; height: 16px; right: 0; bottom: 0; cursor: se-resize; }
+        .traffic-light { width: 0.75rem; height: 0.75rem; border-radius: 9999px; cursor: pointer; }
+        #taskbar { position: absolute; bottom: 0; left: 0; right: 0; height: 48px; background-color: var(--taskbar-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--border-color); z-index: 50; display: flex; align-items: center; padding: 0 8px; }
+        #start-menu { position: absolute; bottom: 48px; left: 0; width: 280px; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 0.5rem; box-shadow: 0 10px 25px -5px var(--shadow-color); z-index: 60; padding: 0.5rem; }
+        .minesweeper-grid { display: grid; gap: 1px; background-color: var(--border-color); }
+        .mine-cell { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background-color: var(--bg-primary); cursor: pointer; font-weight: bold; }
+        .mine-cell.revealed { background-color: var(--bg-secondary); }
     </style>
 </head>
-<body>
+<body class="overflow-hidden">
 
-    <div class="scene-container">
-        <div class="spacetime-grid"></div>
-
-        <div class="sun-container">
-            <div id="sun" class="sun-button">
-                <span>it's<br>giving<br>life</span>
-            </div>
-
-            <div class="project-orbit"></div>
-        </div>
+    <div id="desktop" class="h-screen w-screen">
+        <!-- Icons will be dynamically added here -->
     </div>
 
+    <div id="taskbar">
+        <button id="start-button" class="px-3 py-1 flex items-center gap-2 rounded-md hover:bg-accent-color hover:text-white transition-colors">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6.878V6a2.25 2.25 0 012.25-2.25h7.5A2.25 2.25 0 0118 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 004.5 9v.878m13.5-3A2.25 2.25 0 0119.5 9v.878m0 0a2.246 2.246 0 00-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0121 12v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6c0-.98.626-1.813 1.5-2.122" /></svg>
+            <span class="font-semibold">Start</span>
+        </button>
+        <div id="taskbar-clock" class="ml-auto font-medium text-sm px-3"></div>
+    </div>
+
+    <div id="start-menu" class="hidden">
+        <div class="p-2 font-bold text-lg border-b border-border-color">itsgiving.life</div>
+        <ul id="start-menu-items" class="py-2">
+            <!-- Start menu items will be added here -->
+        </ul>
+    </div>
+    
     <script>
+        const projects = {
+            "sudoku": { name: "Sudoku", url: "https://cdbyall.github.io/sudoku/", icon: `<svg class="h-12 w-12 text-blue-500" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4h4v4h-4z" /><path d="M4 10h4v4h-4z" /><path d="M4 16h4v4h-4z" /><path d="M10 4h4v4h-4z" /><path d="M10 10h4v4h-4z" /><path d="M10 16h4v4h-4z" /><path d="M16 4h4v4h-4z" /><path d="M16 10h4v4h-4z" /><path d="M16 16h4v4h-4z" /></svg>` },
+            "solitaire": { name: "Solitaire", url: "https://cdbyall.github.io/solitaire", icon: `<svg class="h-12 w-12 text-green-500" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><path d="M18.26 10.327c-1.235-2.34-3.852-3.615-6.26-3.615s-5.025 1.275-6.26 3.615c-2.34 4.455 2.145 10.815 6.26 10.815s8.6-6.36 6.26-10.815z"/></svg>` },
+            "hours": { name: "Hours For Shelby", url: "https://cdbyall.github.io/clock", icon: `<svg class="h-12 w-12 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>` },
+            "bam": { name: "Bam Joard", url: "https://cdbyall.github.io/clock/bam", icon: `<svg class="h-12 w-12 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM18 13.5a3.375 3.375 0 00-3.375-3.375L18 13.5m0 0L19.035 12a3.375 3.375 0 002.455-2.456L21.75 9l-1.035-.259a3.375 3.375 0 00-2.456-2.456L18 5.25l-.259 1.035a3.375 3.375 0 00-2.456 2.456L14.25 9l1.035.259a3.375 3.375 0 002.456 2.456L18 13.5z" /></svg>` },
+            "notepad": { name: "Notepad", type: "app", icon: `<svg class="h-12 w-12 text-yellow-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>` },
+            "minesweeper": { name: "Minesweeper", type: "app", icon: `<svg class="h-12 w-12 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12.75 3.03v.568c0 .345.28.625.625.625h.568c.345 0 .625-.28.625-.625v-.568a2.25 2.25 0 012.25-2.25h.568c.345 0 .625.28.625.625v.568c0 .345.28.625.625.625h.568c.345 0 .625-.28.625-.625v-.568a2.25 2.25 0 012.25-2.25h.568c.345 0 .625.28.625.625v.568c0 .345.28.625.625.625h.568a2.25 2.25 0 012.25 2.25v.568c0 .345-.28.625-.625.625h-.568c-.345 0-.625.28-.625.625v.568c0 .345-.28.625-.625.625h-.568c-.345 0-.625.28-.625.625v.568c0 .345-.28.625-.625.625h-.568a2.25 2.25 0 01-2.25 2.25h-.568c-.345 0-.625-.28-.625-.625v-.568c0-.345-.28-.625-.625-.625h-.568c-.345 0-.625.28-.625.625v.568c0 .345-.28.625-.625.625H9.75a2.25 2.25 0 01-2.25-2.25v-.568c0-.345.28-.625.625-.625h.568c.345 0 .625-.28.625-.625v-.568c0-.345.28-.625.625-.625h.568c.345 0 .625-.28.625-.625V3.03m-2.43 9.138c.225.015.45.03.675.03h.008c.225 0 .45-.015.675-.03m-.683 4.653c.225.015.45.03.675.03h.008c.225 0 .45-.015.675-.03m-3.375-3.375c.225.015.45.03.675.03h.008c.225 0 .45-.015.675-.03m-3.375 3.375c.225.015.45.03.675.03h.008c.225 0 .45-.015.675-.03m-3.375-3.375c.225.015.45.03.675.03h.008c.225 0 .45-.015.675-.03m0 0l-3.375 3.375m3.375-3.375l-3.375-3.375" /></svg>` }
+        };
+
         document.addEventListener('DOMContentLoaded', () => {
-            const sunButton = document.getElementById('sun');
-            const sunContainer = document.querySelector('.sun-container');
-            const projectOrbit = document.querySelector('.project-orbit');
+            const desktop = document.getElementById('desktop');
+            const startButton = document.getElementById('start-button');
+            const startMenu = document.getElementById('start-menu');
+            const startMenuItems = document.getElementById('start-menu-items');
+            const clock = document.getElementById('taskbar-clock');
+            let zIndexCounter = 10;
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-            // --- Your Projects ---
-            // You can easily add or change projects here
-            const projects = [
-                { name: 'Bam Joard', url: './bam-joard.html' },
-                { name: 'Star Atlas', url: '#' },
-                { name: 'Code Hub', url: '#' },
-                { name: 'Bio Link', url: '#' },
-                { name: 'Art Gallery', url: '#' }
-            ];
+            // --- CLOCK ---
+            function updateClock() {
+                clock.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
 
-            // --- Planet Creation & Positioning ---
-            const planetCount = projects.length;
-            const radius = 250; // Controls how far the planets orbit from the sun
-            const angleIncrement = (2 * Math.PI) / planetCount;
-
-            projects.forEach((project, index) => {
-                // Calculate the position for each planet in a circle
-                const angle = index * angleIncrement - (Math.PI / 2); // Start from the top
-                const x = radius * Math.cos(angle);
-                const y = radius * Math.sin(angle);
-
-                // Create the planet element
-                const planet = document.createElement('a');
-                planet.href = project.url;
-                planet.className = 'project-planet';
-                planet.textContent = project.name;
-
-                // Set a CSS custom property for the final animated position.
-                // This is a clean way to pass a dynamic value from JS to CSS.
-                planet.style.setProperty('--transform-end', `translate(${x}px, ${y}px)`);
+            // --- ICONS & START MENU ---
+            Object.keys(projects).forEach((id, index) => {
+                const project = projects[id];
+                const iconEl = document.createElement('div');
+                iconEl.className = 'desktop-icon';
+                iconEl.style.top = `${20 + Math.floor(index / 2) * 110}px`;
+                iconEl.style.left = `${20 + (index % 2) * 100}px`;
+                iconEl.innerHTML = `<div class="flex justify-center">${project.icon}</div><div class="icon-label text-sm text-text-primary rounded-md px-1 py-0.5 truncate">${project.name}</div>`;
                 
-                // Add a small delay to each planet's animation for a staggered, flowing effect.
-                planet.style.transitionDelay = `${index * 0.1}s`;
+                const eventType = isMobile ? 'click' : 'dblclick';
+                iconEl.addEventListener(eventType, () => createWindow(id));
+                if (!isMobile) makeDraggable(iconEl, iconEl);
+                desktop.appendChild(iconEl);
 
-                projectOrbit.appendChild(planet);
+                const menuItem = document.createElement('li');
+                menuItem.innerHTML = `<a href="#" data-project-id="${id}" class="flex items-center gap-3 p-2 rounded-md hover:bg-accent-color hover:text-white">${project.icon.replace('h-12 w-12', 'h-6 w-6')}<span>${project.name}</span></a>`;
+                startMenuItems.appendChild(menuItem);
             });
 
-
-            // --- Click Interaction ---
-            // Toggles the 'is-open' class, which triggers all the CSS animations.
-            sunButton.addEventListener('click', () => {
-                sunContainer.classList.toggle('is-open');
+            startMenuItems.addEventListener('click', (e) => {
+                const link = e.target.closest('a');
+                if (link && link.dataset.projectId) {
+                    e.preventDefault();
+                    createWindow(link.dataset.projectId);
+                    startMenu.classList.add('hidden');
+                }
             });
+
+            startButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                startMenu.classList.toggle('hidden');
+            });
+            document.addEventListener('click', () => startMenu.classList.add('hidden'));
+
+            // --- WINDOW MANAGER ---
+            function createWindow(projectId) {
+                const existing = document.getElementById(`win-${projectId}`);
+                if (existing) { focusWindow(existing); return; }
+
+                const project = projects[projectId];
+                const win = document.createElement('div');
+                win.id = `win-${projectId}`;
+                win.className = 'window';
+                if (isMobile) { win.style.cssText = 'top:0;left:0;width:100%;height:100%;border-radius:0;'; } 
+                else { win.style.cssText = `width:720px;height:540px;top:${Math.random()*100+50}px;left:${Math.random()*200+150}px;`; }
+                
+                win.innerHTML = `
+                    <div class="window-titlebar">
+                        <div class="flex items-center space-x-2">
+                            <button class="traffic-light bg-red-500" data-action="close"></button>
+                        </div>
+                        <span class="text-sm font-medium text-text-secondary truncate">${project.name}</span>
+                        <div class="w-6"></div>
+                    </div>
+                    <div class="window-content" id="content-${projectId}"></div>
+                    ${!isMobile ? '<div class="resize-handle"></div>' : ''}
+                `;
+                desktop.appendChild(win);
+                
+                const contentArea = win.querySelector(`#content-${projectId}`);
+                if (project.type === 'app') {
+                    if (projectId === 'notepad') contentArea.innerHTML = `<textarea class="w-full h-full p-2 bg-transparent resize-none border-0 focus:ring-0"></textarea>`;
+                    if (projectId === 'minesweeper') new Minesweeper(contentArea);
+                } else {
+                    contentArea.innerHTML = `<iframe src="${project.url}" class="w-full h-full border-0"></iframe>`;
+                }
+
+                focusWindow(win);
+                if (!isMobile) { makeDraggable(win, win.querySelector('.window-titlebar')); makeResizable(win); }
+                win.addEventListener('mousedown', () => focusWindow(win), true);
+                win.querySelector('[data-action="close"]').addEventListener('click', (e) => { e.stopPropagation(); win.remove(); });
+            }
+
+            function focusWindow(win) { if (win) win.style.zIndex = ++zIndexCounter; }
+            function makeDraggable(el, handle) { /* Dragging logic as before */ }
+            function makeResizable(el) { /* Resizing logic as before */ }
+
+            // --- MINESWEEPER GAME LOGIC ---
+            class Minesweeper {
+                constructor(container) {
+                    this.container = container;
+                    this.rows = 10;
+                    this.cols = 10;
+                    this.mines = 15;
+                    this.grid = [];
+                    this.gameOver = false;
+                    this.init();
+                }
+                init() {
+                    this.container.innerHTML = `<div class="p-4"><div class="minesweeper-grid"></div></div>`;
+                    this.gridEl = this.container.querySelector('.minesweeper-grid');
+                    this.gridEl.style.gridTemplateColumns = `repeat(${this.cols}, 1fr)`;
+                    // Create grid
+                    for (let r = 0; r < this.rows; r++) {
+                        this.grid[r] = [];
+                        for (let c = 0; c < this.cols; c++) {
+                            const cell = { r, c, hasMine: false, revealed: false, flagged: false, count: 0 };
+                            this.grid[r][c] = cell;
+                            const cellEl = document.createElement('div');
+                            cellEl.className = 'mine-cell';
+                            cellEl.addEventListener('click', () => this.reveal(cell));
+                            cellEl.addEventListener('contextmenu', (e) => { e.preventDefault(); this.flag(cell); });
+                            cell.el = cellEl;
+                            this.gridEl.appendChild(cellEl);
+                        }
+                    }
+                    // Place mines
+                    let minesPlaced = 0;
+                    while (minesPlaced < this.mines) {
+                        const r = Math.floor(Math.random() * this.rows);
+                        const c = Math.floor(Math.random() * this.cols);
+                        if (!this.grid[r][c].hasMine) {
+                            this.grid[r][c].hasMine = true;
+                            minesPlaced++;
+                        }
+                    }
+                    // Calculate counts
+                    for (let r = 0; r < this.rows; r++) {
+                        for (let c = 0; c < this.cols; c++) {
+                            if (this.grid[r][c].hasMine) continue;
+                            let count = 0;
+                            for (let dr = -1; dr <= 1; dr++) {
+                                for (let dc = -1; dc <= 1; dc++) {
+                                    if (dr === 0 && dc === 0) continue;
+                                    const nr = r + dr, nc = c + dc;
+                                    if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols && this.grid[nr][nc].hasMine) {
+                                        count++;
+                                    }
+                                }
+                            }
+                            this.grid[r][c].count = count;
+                        }
+                    }
+                }
+                reveal(cell) {
+                    if (this.gameOver || cell.revealed || cell.flagged) return;
+                    cell.revealed = true;
+                    cell.el.classList.add('revealed');
+                    if (cell.hasMine) {
+                        this.gameOver = true;
+                        cell.el.innerHTML = '💣';
+                        alert('Game Over!');
+                        return;
+                    }
+                    if (cell.count > 0) {
+                        cell.el.textContent = cell.count;
+                    } else {
+                        // Flood fill
+                        for (let dr = -1; dr <= 1; dr++) {
+                            for (let dc = -1; dc <= 1; dc++) {
+                                if (dr === 0 && dc === 0) continue;
+                                const nr = cell.r + dr, nc = cell.c + dc;
+                                if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols) {
+                                    this.reveal(this.grid[nr][nc]);
+                                }
+                            }
+                        }
+                    }
+                }
+                flag(cell) {
+                    if (this.gameOver || cell.revealed) return;
+                    cell.flagged = !cell.flagged;
+                    cell.el.textContent = cell.flagged ? '🚩' : '';
+                }
+            }
+            // Add makeDraggable and makeResizable functions here as they were in previous versions.
+            function makeDraggable(element, handle) { let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0; handle.onmousedown = dragMouseDown; function dragMouseDown(e) { e.preventDefault(); pos3 = e.clientX; pos4 = e.clientY; document.onmouseup = closeDragElement; document.onmousemove = elementDrag; focusWindow(element.classList.contains('window') ? element : null); } function elementDrag(e) { e.preventDefault(); pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY; pos3 = e.clientX; pos4 = e.clientY; element.style.top = (element.offsetTop - pos2) + "px"; element.style.left = (element.offsetLeft - pos1) + "px"; } function closeDragElement() { document.onmouseup = null; document.onmousemove = null; } }
+            function makeResizable(element) { const handle = element.querySelector('.resize-handle'); if (!handle) return; let original_width = 0, original_height = 0, original_x = 0, original_y = 0; handle.onmousedown = function(e) { e.preventDefault(); e.stopPropagation(); original_width = parseFloat(getComputedStyle(element, null).getPropertyValue('width').replace('px', '')); original_height = parseFloat(getComputedStyle(element, null).getPropertyValue('height').replace('px', '')); original_x = e.pageX; original_y = e.pageY; window.onmousemove = resizeElement; window.onmouseup = stopResize; }; function resizeElement(e) { const width = original_width + (e.pageX - original_x); const height = original_height + (e.pageY - original_y); element.style.width = width + 'px'; element.style.height = height + 'px'; } function stopResize() { window.onmousemove = null; window.onmouseup = null; } }
         });
     </script>
 </body>
