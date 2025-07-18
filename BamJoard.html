@@ -1068,16 +1068,10 @@
                 const dy = currentPos.y - initialPos.y;
                 const elementState = jamState.frames[jamState.currentFrameIndex].find(el => el.id === selectedElementId);
                 
-                let newX = initialElementState.x + dx;
-                let newY = initialElementState.y + dy;
+                // *** FIX: Removed faulty boundary checks to allow free movement ***
+                elementState.x = initialElementState.x + dx;
+                elementState.y = initialElementState.y + dy;
 
-                // Simple boundary check to prevent dragging off-screen
-                const boardRect = board.getBoundingClientRect();
-                newX = Math.max(0, Math.min(newX, boardRect.width - elementState.width));
-                newY = Math.max(0, Math.min(newY, boardRect.height - elementState.height));
-
-                elementState.x = newX;
-                elementState.y = newY;
                 renderBoard();
             } else if (isResizing) {
                 e.preventDefault();
@@ -1085,16 +1079,14 @@
                 const dx = currentPos.x - initialPos.x;
                 const dy = currentPos.y - initialPos.y;
                 const elementState = jamState.frames[jamState.currentFrameIndex].find(el => el.id === selectedElementId);
-                const boardRect = board.getBoundingClientRect();
 
                 let newWidth = initialElementState.width + dx;
                 let newHeight = initialElementState.height + dy;
 
-                newWidth = Math.max(50, Math.min(newWidth, boardRect.width - elementState.x));
-                newHeight = Math.max(20, Math.min(newHeight, boardRect.height - elementState.y));
+                // *** FIX: Removed faulty boundary checks, only enforce a minimum size ***
+                elementState.width = Math.max(50, newWidth);
+                elementState.height = Math.max(20, newHeight);
 
-                elementState.width = newWidth;
-                elementState.height = newHeight;
                 renderBoard();
             }
         }
