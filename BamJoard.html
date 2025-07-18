@@ -498,8 +498,6 @@
         let initialElementState = { x: 0, y: 0, width: 0, height: 0 };
         let viewState = { panX: 0, panY: 0 };
         let initialPan = { x: 0, y: 0 };
-        // A temporary element used for client-side dragging visuals before state is confirmed by host
-        let ghostElement = null;
 
         // --- UI UTILITIES ---
         function showToast(message, duration = 3000) {
@@ -566,10 +564,9 @@
         function processClientAction(action, payload) {
             if (!isHost) return;
             
-            // The host will perform the action on behalf of the client
             recordHistory();
             
-            let element; // Re-usable element variable
+            let element;
 
             switch (action) {
                 case 'add-element':
@@ -615,7 +612,7 @@
                     break;
             }
 
-            renderBoard();
+            // After processing, broadcast the new truth to everyone
             broadcastStateFromHost();
         }
 
@@ -640,18 +637,23 @@
 
                 peer.on('open', id => {
                     isHost = true;
-                    connectedUsers = [{ name: userName, id: id }];
-                    updateUsersUI();
                     showToast(`Board "${boardName}" created! Waiting for others...`);
+                    
+                    // Setup board state
                     jamState = { frames: [[]], currentFrameIndex: 0 };
                     history = [];
                     redoStack = [];
-                    updateUndoRedoButtons();
-                    renderBoard();
+                    
+                    // Show the main application UI
                     boardNameModal.classList.add('hidden');
                     mainApp.classList.remove('hidden');
                     leaveBoardBtn.classList.remove('hidden');
+                    
+                    // Render and update UI elements now that they are visible
                     resizeCanvas();
+                    renderBoard();
+                    updateUsersUI();
+                    updateUndoRedoButtons();
                 });
 
                 peer.on('connection', conn => {
@@ -673,7 +675,7 @@
 
                 peer.on('open', () => {
                     const conn = peer.connect(peerId, { metadata: { name: userName } });
-                    connections.push(conn); // Client's single connection to the host
+                    connections = [conn]; // Client's single connection to the host
                     setupConnection(conn);
                     
                     const connectionTimeout = setTimeout(() => {
@@ -695,24 +697,20 @@
 
         function setupConnection(conn) {
             if (isHost) {
-                // Host logic: listen for actions from this client
                 connections.push(conn);
                 conn.on('data', data => {
                     if (data.type === 'action') {
                         processClientAction(data.action, data.payload);
                     }
                 });
-            } else {
-                // Client logic: listen for updates from the host
+            } else { // Client logic
                 conn.on('data', data => {
                     if (data.type === 'sync' || data.type === 'update') {
                         jamState = data.state;
-                        // For clients, received state is the source of truth, so clear local history
-                        history = []; 
-                        redoStack = [];
+                        history = []; redoStack = []; // Clients don't have history
                         renderBoard();
                         updateUndoRedoButtons();
-                        if (data.users) { // Sync message contains user list
+                        if (data.users) {
                             connectedUsers = data.users.map(name => ({name}));
                             updateUsersUI();
                         }
@@ -729,10 +727,8 @@
                     showToast(`User "${newUserName}" has joined.`);
                     connectedUsers.push({ name: newUserName, id: conn.peer });
                     broadcastUserList();
-                    // Send the full current state to the new user
                     conn.send({ type: 'sync', state: jamState, users: connectedUsers.map(u => u.name) });
                 } else {
-                    // Client has successfully connected to host
                     boardNameModal.classList.add('hidden');
                     mainApp.classList.remove('hidden');
                     leaveBoardBtn.classList.remove('hidden');
@@ -791,14 +787,11 @@
                 locked: false,
                 ...data
             };
-
             if (type === 'sticky-note') {
-                newElement.content = 'Edit me!';
-                newElement.width = 200; newElement.height = 200;
+                newElement.content = 'Edit me!'; newElement.width = 200; newElement.height = 200;
                 newElement.color = data.color || '#fef9c3';
             } else if (type === 'text-box') {
-                newElement.content = '';
-                newElement.width = 200; newElement.height = 60;
+                newElement.content = ''; newElement.width = 200; newElement.height = 60;
                 newElement.fontFamily = data.fontFamily || 'Inter';
             } else if (type === 'image') {
                 newElement.width = 300; newElement.height = 300;
@@ -810,14 +803,10 @@
             jamState.frames[jamState.currentFrameIndex].push(newElement);
             return newElement.id;
         }
-
         function _addStroke(strokeData) {
             const newStroke = {
                 id: `stroke_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                type: 'stroke',
-                points: strokeData.points,
-                color: strokeData.color,
-                width: strokeData.width
+                type: 'stroke', ...strokeData
             };
             jamState.frames[jamState.currentFrameIndex].push(newStroke);
         }
@@ -835,7 +824,6 @@
                 sendActionToServer('add-element', { type: type, data: data });
             }
         }
-
         function addStroke() {
             if (currentPath.length < 2) return;
             const strokeData = { points: currentPath, color: penColor, width: 4 };
@@ -854,17 +842,14 @@
             board.style.transform = transform;
             drawingCanvas.style.transform = transform;
         }
-        
         function findElement(id) {
             return jamState.frames[jamState.currentFrameIndex].find(el => el.id === id);
         }
-
         function renderBoard() {
             applyViewTransform();
             const currentFrame = jamState.frames[jamState.currentFrameIndex];
             board.innerHTML = '';
             ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-
             currentFrame.forEach(elemData => {
                 if (elemData.type === 'stroke') {
                     drawStroke(elemData);
@@ -874,34 +859,21 @@
             });
             updateFrameIndicator();
         }
-
         const stickerShapes = {
             circle: `<circle cx="50" cy="50" r="50"/>`,
             star: `<polygon points="50,0 61.8,38.2 100,38.2 69.1,61.8 80.9,100 50,76.4 19.1,100 30.9,61.8 0,38.2 38.2,38.2"/>`,
             triangle: `<polygon points="50,0 100,100 0,100"/>`
         };
-
         function renderDivElement(elemData) {
             const elemDiv = document.createElement('div');
             elemDiv.id = elemData.id;
             elemDiv.className = `joard-element ${elemData.type}`;
-            if (elemData.id === selectedElementId) {
-                elemDiv.classList.add('selected');
-            }
-            if (elemData.locked) {
-                elemDiv.classList.add('locked');
-            }
-            elemDiv.style.left = `${elemData.x}px`;
-            elemDiv.style.top = `${elemData.y}px`;
-            elemDiv.style.width = `${elemData.width}px`;
-            elemDiv.style.height = `${elemData.height}px`;
-            if(elemData.type === 'sticky-note') {
-                elemDiv.style.backgroundColor = elemData.color;
-            }
-            if(elemData.type === 'text-box') {
-                elemDiv.style.fontFamily = elemData.fontFamily;
-                elemDiv.style.fontSize = `${elemData.height * 0.7}px`;
-            }
+            if (elemData.id === selectedElementId) elemDiv.classList.add('selected');
+            if (elemData.locked) elemDiv.classList.add('locked');
+            elemDiv.style.left = `${elemData.x}px`; elemDiv.style.top = `${elemData.y}px`;
+            elemDiv.style.width = `${elemData.width}px`; elemDiv.style.height = `${elemData.height}px`;
+            if(elemData.type === 'sticky-note') elemDiv.style.backgroundColor = elemData.color;
+            if(elemData.type === 'text-box') { elemDiv.style.fontFamily = elemData.fontFamily; elemDiv.style.fontSize = `${elemData.height * 0.7}px`; }
 
             if (elemData.type === 'image') {
                 const img = document.createElement('img');
@@ -914,28 +886,21 @@
                 svg.innerHTML = stickerShapes[elemData.shape] || stickerShapes.circle;
                 svg.style.fill = elemData.color;
                 elemDiv.appendChild(svg);
-            } else { // This block handles sticky-notes and text-boxes
+            } else {
                 const textArea = document.createElement('textarea');
                 textArea.value = elemData.content;
-                textArea.style.fontFamily = 'inherit';
-                textArea.style.fontSize = 'inherit';
+                textArea.style.fontFamily = 'inherit'; textArea.style.fontSize = 'inherit';
                 textArea.disabled = elemData.locked;
                 
                 textArea.addEventListener('input', () => {
                     if (isHost) {
                         const targetElement = findElement(elemData.id);
-                        if (targetElement) {
-                            recordHistory();
-                            targetElement.content = textArea.value;
-                            broadcastStateFromHost();
-                        }
+                        if (targetElement) { targetElement.content = textArea.value; broadcastStateFromHost(); }
                     }
                 });
-
-                textArea.addEventListener('focus', () => { elemDiv.classList.add('editing'); });
+                textArea.addEventListener('focus', () => elemDiv.classList.add('editing'));
                 textArea.addEventListener('blur', () => {
                     elemDiv.classList.remove('editing');
-                    // On blur, client sends final content to host
                     if (!isHost) {
                         const element = findElement(elemData.id);
                         if (element && textArea.value !== element.content) {
@@ -952,14 +917,8 @@
             const deleteHandler = (e) => {
                 e.stopPropagation();
                 if (findElement(elemData.id)?.locked) return;
-                if (isHost) {
-                    recordHistory();
-                    jamState.frames[jamState.currentFrameIndex] = jamState.frames[jamState.currentFrameIndex].filter(el => el.id !== elemData.id);
-                    renderBoard();
-                    broadcastStateFromHost();
-                } else {
-                    sendActionToServer('delete-element', { id: elemData.id });
-                }
+                if (isHost) { recordHistory(); jamState.frames[jamState.currentFrameIndex] = jamState.frames[jamState.currentFrameIndex].filter(el => el.id !== elemData.id); renderBoard(); broadcastStateFromHost(); } 
+                else { sendActionToServer('delete-element', { id: elemData.id }); }
                 selectedElementId = null;
                 updateContextualToolbar();
             };
@@ -967,34 +926,16 @@
             deleteBtn.addEventListener('touchstart', deleteHandler);
             elemDiv.appendChild(deleteBtn);
 
-            if (isHost) { // Locking is a host-only privilege
+            if (isHost) {
                 const lockBtn = document.createElement('div');
                 lockBtn.className = 'context-btn lock-btn';
                 lockBtn.innerHTML = `<i class="fas ${elemData.locked ? 'fa-lock' : 'fa-lock-open'} fa-xs"></i>`;
-                lockBtn.addEventListener('mousedown', (e) => {
-                    e.stopPropagation();
-                    recordHistory();
-                    const elem = findElement(elemData.id);
-                    if(elem) elem.locked = !elem.locked;
-                    renderBoard();
-                    broadcastStateFromHost();
-                });
+                lockBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); recordHistory(); const elem = findElement(elemData.id); if(elem) elem.locked = !elem.locked; renderBoard(); broadcastStateFromHost(); });
                 elemDiv.appendChild(lockBtn);
             }
 
             if (!elemData.locked) {
-                const layerHandler = (e, direction) => {
-                    e.stopPropagation();
-                    if (isHost) {
-                        recordHistory();
-                        direction === 'up' ? _moveElementForward(elemData.id) : _moveElementBackward(elemData.id);
-                        renderBoard();
-                        broadcastStateFromHost();
-                    } else {
-                        sendActionToServer('layer-element', { id: elemData.id, direction: direction });
-                    }
-                };
-
+                const layerHandler = (e, direction) => { e.stopPropagation(); if (isHost) { recordHistory(); direction === 'up' ? _moveElementForward(elemData.id) : _moveElementBackward(elemData.id); renderBoard(); broadcastStateFromHost(); } else { sendActionToServer('layer-element', { id: elemData.id, direction: direction }); } };
                 const layerUpBtn = document.createElement('div');
                 layerUpBtn.className = 'context-btn layer-up-btn';
                 layerUpBtn.innerHTML = '<i class="fas fa-arrow-up fa-xs"></i>';
@@ -1002,7 +943,6 @@
                 layerUpBtn.addEventListener('mousedown', (e) => layerHandler(e, 'up'));
                 layerUpBtn.addEventListener('touchstart', (e) => layerHandler(e, 'up'));
                 elemDiv.appendChild(layerUpBtn);
-
                 const layerDownBtn = document.createElement('div');
                 layerDownBtn.className = 'context-btn layer-down-btn';
                 layerDownBtn.innerHTML = '<i class="fas fa-arrow-down fa-xs"></i>';
@@ -1017,92 +957,24 @@
                 resizeHandle.className = 'resize-handle';
                 elemDiv.appendChild(resizeHandle);
             }
-            
             board.appendChild(elemDiv);
         }
-
-        function drawStroke(strokeData) {
-            ctx.beginPath();
-            ctx.strokeStyle = strokeData.color;
-            ctx.lineWidth = strokeData.width;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            if (strokeData.points.length > 0) {
-                ctx.moveTo(strokeData.points[0].x, strokeData.points[0].y);
-                for (let i = 1; i < strokeData.points.length; i++) {
-                    ctx.lineTo(strokeData.points[i].x, strokeData.points[i].y);
-                }
-            }
-            ctx.stroke();
-        }
+        function drawStroke(strokeData) { /* ... unchanged ... */ }
 
         // --- CANVAS & INTERACTIVITY ---
-        function resizeCanvas() {
-            if (!mainApp.classList.contains('hidden')) {
-                const rect = boardContainer.getBoundingClientRect();
-                drawingCanvas.width = rect.width;
-                drawingCanvas.height = rect.height;
-                renderBoard();
-            }
-        }
-
-        function getEventPos(evt) {
-            const rect = boardContainer.getBoundingClientRect();
-            const clientX = evt.clientX || evt.touches[0].clientX;
-            const clientY = evt.clientY || evt.touches[0].clientY;
-            return {
-                x: clientX - rect.left - viewState.panX,
-                y: clientY - rect.top - viewState.panY
-            };
-        }
-
-        function eraseStrokesAt(pos) {
-            const eraserRadius = 15;
-            const currentFrame = jamState.frames[jamState.currentFrameIndex];
-            const strokesToDelete = new Set();
-            for (const elem of currentFrame) {
-                if (elem.type === 'stroke') {
-                    for (const point of elem.points) {
-                        if (Math.hypot(point.x - pos.x, point.y - pos.y) < eraserRadius) {
-                            strokesToDelete.add(elem.id);
-                            break;
-                        }
-                    }
-                }
-            }
-            if (strokesToDelete.size > 0) {
-                 if (isHost) {
-                    recordHistory();
-                    jamState.frames[jamState.currentFrameIndex] = currentFrame.filter(elem => !strokesToDelete.has(elem.id));
-                    renderBoard();
-                    broadcastStateFromHost();
-                 } else {
-                    strokesToDelete.forEach(id => sendActionToServer('delete-element', {id}));
-                 }
-            }
-        }
-
+        function resizeCanvas() { /* ... unchanged ... */ }
+        function getEventPos(evt) { /* ... unchanged ... */ }
+        function eraseStrokesAt(pos) { /* ... unchanged ... */ }
         function handleMouseDown(e) {
             if (e.target.tagName.toLowerCase() === 'textarea') {
                 const parentElementDiv = e.target.closest('.joard-element');
                 if (parentElementDiv) {
                     const elementState = findElement(parentElementDiv.id);
-                    if (elementState?.locked) {
-                        e.target.blur(); return;
-                    }
-                    if (selectedElementId !== parentElementDiv.id) {
-                        selectedElementId = parentElementDiv.id;
-                        renderBoard();
-                    }
+                    if (elementState?.locked) { e.target.blur(); return; }
+                    if (selectedElementId !== parentElementDiv.id) { selectedElementId = parentElementDiv.id; renderBoard(); }
                     setTimeout(() => {
-                        const currentElementDiv = document.getElementById(parentElementDiv.id);
-                        if(currentElementDiv) {
-                            const textArea = currentElementDiv.querySelector('textarea');
-                            if (textArea) {
-                                textArea.focus();
-                                textArea.setSelectionRange(textArea.value.length, textArea.value.length);
-                            }
-                        }
+                        const el = document.getElementById(parentElementDiv.id)?.querySelector('textarea');
+                        if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
                     }, 0);
                 }
                 return;
@@ -1110,234 +982,114 @@
 
             const targetElementDiv = e.target.closest('.joard-element');
             if (activeTool === 'select' && !targetElementDiv && !e.target.closest('.context-btn')) {
-                isPanning = true;
-                boardContainer.style.cursor = 'grabbing';
+                isPanning = true; boardContainer.style.cursor = 'grabbing';
                 const rect = boardContainer.getBoundingClientRect();
-                const clientX = e.clientX || e.touches[0].clientX;
-                const clientY = e.clientY || e.touches[0].clientY;
-                initialPos = { x: clientX - rect.left, y: clientY - rect.top };
-                initialPan = { ...viewState };
-                return;
+                initialPos = { x: (e.clientX || e.touches[0].clientX) - rect.left, y: (e.clientY || e.touches[0].clientY) - rect.top };
+                initialPan = { ...viewState }; return;
             }
 
             const pos = getEventPos(e);
             const elementState = targetElementDiv ? findElement(targetElementDiv.id) : null;
 
-            if (activeTool === 'pen') {
-                isDrawing = true;
-                currentPath = [pos]; return;
-            }
-            if (activeTool === 'eraser') {
-                isErasing = true;
-                eraseStrokesAt(pos); return;
-            }
+            if (activeTool === 'pen') { isDrawing = true; currentPath = [pos]; return; }
+            if (activeTool === 'eraser') { isErasing = true; eraseStrokesAt(pos); return; }
             if (activeTool.startsWith('adding-')) {
                 const typeMap = { 'adding-sticky': 'sticky-note', 'adding-text': 'text-box', 'adding-sticker': 'sticker' };
                 const type = typeMap[activeTool];
-                if (type === 'text-box') {
-                    const newId = addElement(type, { x: pos.x, y: pos.y, fontFamily: textFont, height: 60 });
+                const data = { x: pos.x, y: pos.y };
+                if (type === 'sticker') { data.color = stickerColor; data.shape = stickerShape; data.x -=15; data.y -=15; }
+                if (type === 'sticky-note') data.color = stickyColor;
+                if (type === 'text-box') data.fontFamily = textFont;
+                const newId = addElement(type, data);
+                if (type === 'text-box' && isHost) {
+                    setActiveTool('select'); selectedElementId = newId; renderBoard();
+                    setTimeout(() => document.getElementById(newId)?.querySelector('textarea').focus(), 0);
+                } else if (type !== 'sticker') {
                     setActiveTool('select');
-                    selectedElementId = newId;
-                    renderBoard();
-                    setTimeout(() => {
-                        const newElemDiv = document.getElementById(newId);
-                        if (newElemDiv) newElemDiv.querySelector('textarea').focus();
-                    }, 0);
-                } else {
-                    const data = { x: pos.x, y: pos.y };
-                    if (type === 'sticky-note') data.color = stickyColor;
-                    if (type === 'sticker') {
-                        data.color = stickerColor; data.shape = stickerShape; data.x -=15; data.y -=15;
-                    }
-                    addElement(type, data);
-                    if (type !== 'sticker') setActiveTool('select');
                 }
                 return;
             }
 
             const targetHandle = e.target.closest('.resize-handle');
-            if (targetHandle && !elementState?.locked) {
-                isResizing = true;
-                selectedElementId = targetHandle.parentElement.id;
-            } else if (targetElementDiv && !elementState?.locked) {
-                isDragging = true;
-                selectedElementId = targetElementDiv.id;
-            } else {
-                selectedElementId = null;
-            }
+            if (targetHandle && !elementState?.locked) { isResizing = true; selectedElementId = targetHandle.parentElement.id; } 
+            else if (targetElementDiv && !elementState?.locked) { isDragging = true; selectedElementId = targetElementDiv.id; } 
+            else { selectedElementId = null; }
 
             if (selectedElementId) {
                 initialPos = pos;
                 const currentElementState = findElement(selectedElementId);
                 if (currentElementState) initialElementState = { ...currentElementState };
-                
-                // For client-side responsive dragging, create a 'ghost' element to move
-                if (!isHost && (isDragging || isResizing)) {
-                    ghostElement = document.getElementById(selectedElementId)?.cloneNode(true);
-                    if (ghostElement) {
-                        ghostElement.style.opacity = '0.5';
-                        ghostElement.style.pointerEvents = 'none';
-                        board.appendChild(ghostElement);
-                    }
-                }
             }
-            
             renderBoard();
             updateContextualToolbar();
         }
-
         function handleMouseMove(e) {
-            if (e.buttons === 0 && e.touches?.length === 0) {
-                if (isPanning) boardContainer.style.cursor = 'grab';
-                if(ghostElement) ghostElement.remove();
-                ghostElement = null;
-                isDrawing = isDragging = isResizing = isPanning = isErasing = false;
-                return;
-            }
-
+            if (e.buttons === 0 && e.touches?.length === 0) { if (isPanning) boardContainer.style.cursor = 'grab'; isDrawing = isDragging = isResizing = isPanning = isErasing = false; return; }
             const currentPos = getEventPos(e);
             if (isPanning) {
-                e.preventDefault();
-                const rect = boardContainer.getBoundingClientRect();
-                const clientX = e.clientX || e.touches[0].clientX;
-                const clientY = e.clientY || e.touches[0].clientY;
-                const currentScreenPos = { x: clientX - rect.left, y: clientY - rect.top };
-                const dx = currentScreenPos.x - initialPos.x;
-                const dy = currentScreenPos.y - initialPos.y;
-                viewState.panX = initialPan.x + dx;
-                viewState.panY = initialPan.y + dy;
-                applyViewTransform();
-                return;
+                e.preventDefault(); const rect = boardContainer.getBoundingClientRect();
+                const currentScreenPos = { x: (e.clientX || e.touches[0].clientX) - rect.left, y: (e.clientY || e.touches[0].clientY) - rect.top };
+                viewState.panX = initialPan.x + (currentScreenPos.x - initialPos.x);
+                viewState.panY = initialPan.y + (currentScreenPos.y - initialPos.y);
+                applyViewTransform(); return;
             }
             if (isErasing) { e.preventDefault(); eraseStrokesAt(currentPos); return; }
-            if (isDrawing) {
-                e.preventDefault();
-                currentPath.push(currentPos);
-                ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-                renderBoard();
-                drawStroke({ points: currentPath, color: penColor, width: 4 });
-                return;
-            }
-
+            if (isDrawing) { e.preventDefault(); currentPath.push(currentPos); ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height); renderBoard(); drawStroke({ points: currentPath, color: penColor, width: 4 }); return; }
             if (isDragging || isResizing) {
                  e.preventDefault();
-                const dx = currentPos.x - initialPos.x;
-                const dy = currentPos.y - initialPos.y;
-                const targetEl = isHost ? findElement(selectedElementId) : ghostElement;
-                if (!targetEl) return;
-                
-                if (isDragging) {
-                    targetEl.style.left = `${initialElementState.x + dx}px`;
-                    targetEl.style.top = `${initialElementState.y + dy}px`;
-                } else if (isResizing) {
-                    targetEl.style.width = `${Math.max(50, initialElementState.width + dx)}px`;
-                    targetEl.style.height = `${Math.max(20, initialElementState.height + dy)}px`;
-                }
+                const dx = currentPos.x - initialPos.x; const dy = currentPos.y - initialPos.y;
+                const liveElement = document.getElementById(selectedElementId);
+                if (!liveElement) return;
+                if (isDragging) { liveElement.style.left = `${initialElementState.x + dx}px`; liveElement.style.top = `${initialElementState.y + dy}px`; } 
+                else if (isResizing) { liveElement.style.width = `${Math.max(50, initialElementState.width + dx)}px`; liveElement.style.height = `${Math.max(20, initialElementState.height + dy)}px`; }
             }
         }
-
-        function handleMouseUp() {
+        function handleMouseUp(e) {
             if (isDrawing) addStroke();
             if (isErasing && isHost) broadcastStateFromHost();
 
             if (isDragging || isResizing) {
-                const finalPos = getEventPos(event);
+                const finalPos = getEventPos(e);
                 const dx = finalPos.x - initialPos.x;
                 const dy = finalPos.y - initialPos.y;
                 const finalState = {};
-
-                if (isDragging) {
-                    finalState.x = initialElementState.x + dx;
-                    finalState.y = initialElementState.y + dy;
-                } else if (isResizing) {
-                    finalState.width = Math.max(50, initialElementState.width + dx);
-                    finalState.height = Math.max(20, initialElementState.height + dy);
-                }
-
+                const action = isDragging ? 'drag-element' : 'resize-element';
+                if (isDragging) { finalState.x = initialElementState.x + dx; finalState.y = initialElementState.y + dy; } 
+                else { finalState.width = Math.max(50, initialElementState.width + dx); finalState.height = Math.max(20, initialElementState.height + dy); }
                 if (isHost) {
                     recordHistory();
                     const element = findElement(selectedElementId);
                     if (element) Object.assign(element, finalState);
-                    renderBoard();
                     broadcastStateFromHost();
                 } else {
-                    const action = isDragging ? 'drag-element' : 'resize-element';
                     sendActionToServer(action, { id: selectedElementId, ...finalState });
                 }
+                renderBoard(); // Client redraws to snap element back to its original place until host update arrives
             }
-            if (ghostElement) { ghostElement.remove(); ghostElement = null; }
             if (isPanning) boardContainer.style.cursor = 'grab';
-            
             isDrawing = false; isDragging = false; isResizing = false;
             isErasing = false; isPanning = false; currentPath = [];
         }
-        
-        // --- UI & TOOL MANAGEMENT ---
-        function setActiveTool(tool) {
-            activeTool = tool;
-            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-            const btnIdMap = { 'pen': 'tool-pen', 'select': 'tool-select', 'eraser': 'tool-eraser', 'adding-sticky': 'tool-sticky', 'adding-text': 'tool-text', 'adding-sticker': 'tool-sticker' };
-            document.getElementById(btnIdMap[tool])?.classList.add('active');
-            const cursorMap = { pen: 'crosshair', eraser: 'cell', 'adding-text': 'text', 'adding-sticky': 'copy', 'adding-sticker': 'copy', select: 'default' };
-            board.style.cursor = cursorMap[tool] || 'default';
-            boardContainer.style.cursor = (tool === 'select') ? 'grab' : 'default';
-            drawingCanvas.style.pointerEvents = (tool === 'pen' || tool === 'eraser') ? 'auto' : 'none';
-            updateContextualToolbar();
-        }
+        function setActiveTool(tool) { /* ... unchanged ... */ }
         function updateContextualToolbar() { /* ... unchanged ... */ }
-
-        // --- LAYER MANAGEMENT (CORE LOGIC) ---
-        function _moveElementForward(elementId) {
-            const currentFrame = jamState.frames[jamState.currentFrameIndex];
-            const index = currentFrame.findIndex(el => el.id === elementId);
-            if (index > -1 && index < currentFrame.length - 1) {
-                [currentFrame[index], currentFrame[index + 1]] = [currentFrame[index + 1], currentFrame[index]];
-            }
-        }
-        function _moveElementBackward(elementId) {
-            const currentFrame = jamState.frames[jamState.currentFrameIndex];
-            const index = currentFrame.findIndex(el => el.id === elementId);
-            if (index > 0) {
-                [currentFrame[index], currentFrame[index - 1]] = [currentFrame[index - 1], currentFrame[index]];
-            }
-        }
-
-        // --- FRAME MANAGEMENT ---
-        function switchFrame(index) {
-            if (isHost) {
-                recordHistory();
-                jamState.currentFrameIndex = index;
-                renderBoard();
-                broadcastStateFromHost();
-            } else {
-                sendActionToServer('switch-frame', { index });
-            }
-        }
-        function addFrame() {
-            if (isHost) {
-                recordHistory();
-                jamState.frames.push([]);
-                jamState.currentFrameIndex = jamState.frames.length - 1;
-                renderBoard();
-                broadcastStateFromHost();
-            } else {
-                sendActionToServer('add-frame', {});
-            }
-        }
+        function _moveElementForward(elementId) { /* ... unchanged ... */ }
+        function _moveElementBackward(elementId) { /* ... unchanged ... */ }
+        function switchFrame(index) { if (isHost) { recordHistory(); jamState.currentFrameIndex = index; renderBoard(); broadcastStateFromHost(); } else { sendActionToServer('switch-frame', { index }); } }
+        function addFrame() { if (isHost) { recordHistory(); jamState.frames.push([]); jamState.currentFrameIndex = jamState.frames.length - 1; renderBoard(); broadcastStateFromHost(); } else { sendActionToServer('add-frame', {}); } }
         function nextFrame() { if (jamState.currentFrameIndex < jamState.frames.length - 1) { switchFrame(jamState.currentFrameIndex + 1); } }
         function prevFrame() { if (jamState.currentFrameIndex > 0) { switchFrame(jamState.currentFrameIndex - 1); } }
 
         // --- EVENT LISTENERS ---
-        window.onload = () => { /* ... unchanged ... */ };
-        nameSubmitBtn.addEventListener('click', () => { /* ... unchanged ... */ });
-        newBoardBtn.addEventListener('click', () => { /* ... unchanged ... */ });
-        joinBoardBtn.addEventListener('click', () => { /* ... unchanged ... */ });
-        boardNameBackBtn.addEventListener('click', () => { /* ... unchanged ... */ });
+        window.addEventListener('load', () => { setTimeout(() => { loadingOverlay.classList.add('hidden'); setTimeout(() => { nameModal.classList.remove('hidden'); nameModalContent.classList.add('visible'); }, 100); }, 500); });
+        nameSubmitBtn.addEventListener('click', () => { const name = nameInput.value.trim(); if (name) { userName = name; nameModalContent.classList.remove('visible'); setTimeout(() => { nameModal.classList.add('hidden'); actionModal.classList.remove('hidden'); actionModal.querySelector('.modal-content').classList.add('visible'); }, 300); } else { showToast("Please enter a name to continue."); } });
+        newBoardBtn.addEventListener('click', () => { joinMode = 'create'; boardNameTitle.textContent = 'Create a New Board'; passwordContainer.classList.remove('hidden'); actionModal.querySelector('.modal-content').classList.remove('visible'); setTimeout(() => { actionModal.classList.add('hidden'); boardNameModal.classList.remove('hidden'); boardNameModal.querySelector('.modal-content').classList.add('visible'); }, 300); });
+        joinBoardBtn.addEventListener('click', () => { joinMode = 'join'; boardNameTitle.textContent = 'Join an Existing Board'; passwordContainer.classList.remove('hidden'); actionModal.querySelector('.modal-content').classList.remove('visible'); setTimeout(() => { actionModal.classList.add('hidden'); boardNameModal.classList.remove('hidden'); boardNameModal.querySelector('.modal-content').classList.add('visible'); }, 300); });
+        boardNameBackBtn.addEventListener('click', () => { boardNameModal.querySelector('.modal-content').classList.remove('visible'); setTimeout(() => { boardNameModal.classList.add('hidden'); actionModal.classList.remove('hidden'); actionModal.querySelector('.modal-content').classList.add('visible'); }, 300); });
         boardNameSubmitBtn.addEventListener('click', startConnection);
-        togglePasswordBtn.addEventListener('click', () => { /* ... unchanged ... */ });
-        leaveBoardBtn.addEventListener('click', () => { /* ... unchanged ... */ });
+        togglePasswordBtn.addEventListener('click', () => { const isPassword = boardPasswordInput.type === 'password'; boardPasswordInput.type = isPassword ? 'text' : 'password'; togglePasswordBtn.innerHTML = `<i class="fas ${isPassword ? 'fa-eye-slash' : 'fa-eye'}"></i>`; });
+        leaveBoardBtn.addEventListener('click', () => { if (isHost) { leaveModalTitle.textContent = 'End Board for All?'; leaveModalText.textContent = 'This will disconnect everyone from the board.'; leaveConfirmBtn.textContent = 'End Board'; } else { leaveModalTitle.textContent = 'Leave Board?'; leaveModalText.textContent = 'Are you sure you want to leave this board?'; leaveConfirmBtn.textContent = 'Leave'; } leaveModal.classList.remove('hidden'); leaveModal.querySelector('.modal-content').classList.add('visible'); });
         leaveConfirmBtn.addEventListener('click', () => { if (peer) peer.destroy(); window.location.reload(); });
-        leaveCancelBtn.addEventListener('click', () => { /* ... unchanged ... */ });
+        leaveCancelBtn.addEventListener('click', () => { leaveModal.querySelector('.modal-content').classList.remove('visible'); setTimeout(() => leaveModal.classList.add('hidden'), 300); });
         toolStickyBtn.addEventListener('click', () => setActiveTool('adding-sticky'));
         toolTextBtn.addEventListener('click', () => setActiveTool('adding-text'));
         toolStickerBtn.addEventListener('click', () => setActiveTool('adding-sticker'));
@@ -1345,30 +1097,15 @@
         toolSelectBtn.addEventListener('click', () => setActiveTool('select'));
         toolPenBtn.addEventListener('click', () => setActiveTool('pen'));
         toolEraserBtn.addEventListener('click', () => setActiveTool('eraser'));
-        undoBtn.addEventListener('click', undo);
-        redoBtn.addEventListener('click', redo);
-        addFrameBtn.addEventListener('mousedown', addFrame);
-        nextFrameBtn.addEventListener('mousedown', nextFrame);
-        prevFrameBtn.addEventListener('mousedown', prevFrame);
+        undoBtn.addEventListener('click', undo); redoBtn.addEventListener('click', redo);
+        addFrameBtn.addEventListener('click', addFrame); nextFrameBtn.addEventListener('click', nextFrame); prevFrameBtn.addEventListener('click', prevFrame);
         contextOptionsContainer.addEventListener('mousedown', e => e.stopPropagation());
         contextOptionsContainer.addEventListener('touchstart', e => e.stopPropagation());
-        penOptions.addEventListener('click', (e) => { /* ... unchanged ... */ });
-        stickyOptions.addEventListener('click', (e) => { /* ... unchanged ... */ });
-        textOptions.addEventListener('click', (e) => { /* ... unchanged ... */ });
-        stickerOptions.addEventListener('click', (e) => { /* ... unchanged ... */ });
-        imageUploadInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const dataUrl = event.target.result;
-                    if (dataUrl.length > 500000) { showToast("Image is too large (max 500KB).", 5000); return; }
-                    addElement('image', { src: dataUrl, x: 150, y: 150 });
-                };
-                reader.readAsDataURL(file);
-            }
-            e.target.value = '';
-        });
+        penOptions.addEventListener('click', (e) => { if (e.target.matches('.color-btn')) { penColor = e.target.dataset.color; penOptions.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active')); e.target.classList.add('active'); } });
+        stickyOptions.addEventListener('click', (e) => { if (e.target.matches('.color-btn')) { stickyColor = e.target.dataset.color; stickyOptions.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active')); e.target.classList.add('active'); if (selectedElementId && findElement(selectedElementId)?.type === 'sticky-note') { if(isHost){recordHistory(); findElement(selectedElementId).color = stickyColor; renderBoard(); broadcastStateFromHost();} else {sendActionToServer('update-element-color', {id: selectedElementId, color: stickyColor});} } } });
+        textOptions.addEventListener('click', (e) => { const fontBtn = e.target.closest('.font-btn'); if (fontBtn) { textFont = fontBtn.dataset.font; textOptions.querySelectorAll('.font-btn').forEach(btn => btn.classList.remove('active')); fontBtn.classList.add('active'); if (selectedElementId && findElement(selectedElementId)?.type === 'text-box') { if(isHost){recordHistory(); findElement(selectedElementId).fontFamily = textFont; renderBoard(); broadcastStateFromHost();} else {sendActionToServer('update-element-font', {id: selectedElementId, font: textFont});} } } });
+        stickerOptions.addEventListener('click', (e) => { const colorBtn = e.target.closest('.color-btn'); const shapeBtn = e.target.closest('.shape-btn'); if (colorBtn) { stickerColor = colorBtn.dataset.color; stickerOptions.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active')); colorBtn.classList.add('active'); } if (shapeBtn) { stickerShape = shapeBtn.dataset.shape; stickerOptions.querySelectorAll('.shape-btn').forEach(btn => btn.classList.remove('active')); shapeBtn.classList.add('active'); } });
+        imageUploadInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (event) => { const dataUrl = event.target.result; if (dataUrl.length > 500000) { showToast("Image is too large (max 500KB).", 5000); return; } addElement('image', { src: dataUrl, x: 150, y: 150 }); }; reader.readAsDataURL(file); } e.target.value = ''; });
         boardContainer.addEventListener('mousedown', handleMouseDown);
         boardContainer.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mouseup', handleMouseUp);
@@ -1379,43 +1116,20 @@
         viewUsersBtn.addEventListener('click', () => usersModal.classList.remove('hidden'));
         closeUsersModalBtn.addEventListener('click', () => usersModal.classList.add('hidden'));
         usersModal.addEventListener('click', e => { if (e.target === usersModal) usersModal.classList.add('hidden'); });
-        presentBtn.addEventListener('click', () => { /* ... unchanged ... */ });
-        document.addEventListener('keydown', (e) => { /* ... unchanged ... */ });
-        exportBtn.addEventListener('click', () => { /* ... unchanged ... */ });
+        presentBtn.addEventListener('click', () => { document.body.classList.toggle('presentation-mode'); setTimeout(resizeCanvas, 100); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('presentation-mode')) { document.body.classList.remove('presentation-mode'); setTimeout(resizeCanvas, 100); } });
+        exportBtn.addEventListener('click', () => { const p = selectedElementId; selectedElementId = null; renderBoard(); html2canvas(boardContainer, { backgroundColor: '#eef2f9', onclone: (d) => { d.getElementById('board').style.transform = board.style.transform; d.getElementById('drawing-canvas').style.transform = drawingCanvas.style.transform; } }).then(c => { const l = document.createElement('a'); l.download = 'bam-joard.png'; l.href = c.toDataURL(); l.click(); selectedElementId = p; renderBoard(); }); });
 
-        // Unchanged functions that needed to be included for completeness
-        (function() {
-            // Re-pasting unchanged functions here to provide a single code block
-            updateContextualToolbar = function() {
-                const allOptions = [penOptions, stickyOptions, textOptions, stickerOptions];
-                allOptions.forEach(opt => opt.classList.add('hidden'));
-                contextOptionsContainer.classList.add('hidden');
-                const toolOptionMap = { pen: penOptions, 'adding-sticky': stickyOptions, 'adding-text': textOptions, 'adding-sticker': stickerOptions };
-                const selectedElem = findElement(selectedElementId);
-                const selectedTypeOptionMap = { 'sticky-note': stickyOptions, 'text-box': textOptions };
-                const optionsToShow = toolOptionMap[activeTool] || (selectedElem ? selectedTypeOptionMap[selectedElem.type] : null);
-                if (optionsToShow) {
-                    optionsToShow.classList.remove('hidden');
-                    contextOptionsContainer.classList.remove('hidden');
-                }
-            }
-            window.onload = () => { setTimeout(() => { loadingOverlay.classList.add('hidden'); setTimeout(() => { nameModal.classList.remove('hidden'); nameModalContent.classList.add('visible'); }, 100); }, 500); };
-            nameSubmitBtn.onclick = () => { const name = nameInput.value.trim(); if (name) { userName = name; nameModalContent.classList.remove('visible'); setTimeout(() => { nameModal.classList.add('hidden'); actionModal.classList.remove('hidden'); actionModal.querySelector('.modal-content').classList.add('visible'); }, 300); } else { showToast("Please enter a name to continue."); } };
-            newBoardBtn.onclick = () => { joinMode = 'create'; boardNameTitle.textContent = 'Create a New Board'; passwordContainer.classList.remove('hidden'); actionModal.querySelector('.modal-content').classList.remove('visible'); setTimeout(() => { actionModal.classList.add('hidden'); boardNameModal.classList.remove('hidden'); boardNameModal.querySelector('.modal-content').classList.add('visible'); }, 300); };
-            joinBoardBtn.onclick = () => { joinMode = 'join'; boardNameTitle.textContent = 'Join an Existing Board'; passwordContainer.classList.remove('hidden'); actionModal.querySelector('.modal-content').classList.remove('visible'); setTimeout(() => { actionModal.classList.add('hidden'); boardNameModal.classList.remove('hidden'); boardNameModal.querySelector('.modal-content').classList.add('visible'); }, 300); };
-            boardNameBackBtn.onclick = () => { boardNameModal.querySelector('.modal-content').classList.remove('visible'); setTimeout(() => { boardNameModal.classList.add('hidden'); actionModal.classList.remove('hidden'); actionModal.querySelector('.modal-content').classList.add('visible'); }, 300); };
-            togglePasswordBtn.onclick = () => { const isPassword = boardPasswordInput.type === 'password'; boardPasswordInput.type = isPassword ? 'text' : 'password'; togglePasswordBtn.innerHTML = `<i class="fas ${isPassword ? 'fa-eye-slash' : 'fa-eye'}"></i>`; };
-            leaveBoardBtn.onclick = () => { if (isHost) { leaveModalTitle.textContent = 'End Board for All?'; leaveModalText.textContent = 'This will disconnect everyone from the board.'; leaveConfirmBtn.textContent = 'End Board'; } else { leaveModalTitle.textContent = 'Leave Board?'; leaveModalText.textContent = 'Are you sure you want to leave this board?'; leaveConfirmBtn.textContent = 'Leave'; } leaveModal.classList.remove('hidden'); leaveModal.querySelector('.modal-content').classList.add('visible'); };
-            leaveCancelBtn.onclick = () => { leaveModal.querySelector('.modal-content').classList.remove('visible'); setTimeout(() => leaveModal.classList.add('hidden'), 300); };
-            penOptions.onclick = (e) => { if (e.target.matches('.color-btn')) { penColor = e.target.dataset.color; penOptions.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active')); e.target.classList.add('active'); } };
-            stickyOptions.onclick = (e) => { if (e.target.matches('.color-btn')) { stickyColor = e.target.dataset.color; stickyOptions.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active')); e.target.classList.add('active'); if (selectedElementId && findElement(selectedElementId)?.type === 'sticky-note') { if(isHost){recordHistory(); findElement(selectedElementId).color = stickyColor; renderBoard(); broadcastStateFromHost();} else {sendActionToServer('update-element-color', {id: selectedElementId, color: stickyColor});} } } };
-            textOptions.onclick = (e) => { const fontBtn = e.target.closest('.font-btn'); if (fontBtn) { textFont = fontBtn.dataset.font; textOptions.querySelectorAll('.font-btn').forEach(btn => btn.classList.remove('active')); fontBtn.classList.add('active'); if (selectedElementId && findElement(selectedElementId)?.type === 'text-box') { if(isHost){recordHistory(); findElement(selectedElementId).fontFamily = textFont; renderBoard(); broadcastStateFromHost();} else {sendActionToServer('update-element-font', {id: selectedElementId, font: textFont});} } } };
-            stickerOptions.onclick = (e) => { const colorBtn = e.target.closest('.color-btn'); const shapeBtn = e.target.closest('.shape-btn'); if (colorBtn) { stickerColor = colorBtn.dataset.color; stickerOptions.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active')); colorBtn.classList.add('active'); } if (shapeBtn) { stickerShape = shapeBtn.dataset.shape; stickerOptions.querySelectorAll('.shape-btn').forEach(btn => btn.classList.remove('active')); shapeBtn.classList.add('active'); } };
-            presentBtn.onclick = () => { document.body.classList.toggle('presentation-mode'); setTimeout(resizeCanvas, 100); };
-            document.onkeydown = (e) => { if (e.key === 'Escape' && document.body.classList.contains('presentation-mode')) { document.body.classList.remove('presentation-mode'); setTimeout(resizeCanvas, 100); } };
-            exportBtn.onclick = () => { const previouslySelected = selectedElementId; selectedElementId = null; renderBoard(); html2canvas(boardContainer, { backgroundColor: '#eef2f9', onclone: (clonedDoc) => { const clonedBoard = clonedDoc.getElementById('board'); const clonedCanvas = clonedDoc.getElementById('drawing-canvas'); clonedBoard.style.transform = board.style.transform; clonedCanvas.style.transform = drawingCanvas.style.transform; } }).then(canvas => { const link = document.createElement('a'); link.download = 'bam-joard.png'; link.href = canvas.toDataURL(); link.click(); selectedElementId = previouslySelected; renderBoard(); }); };
-        })();
-
+        // Helper functions used across the script that are unchanged
+        drawStroke = (strokeData) => { ctx.beginPath(); ctx.strokeStyle = strokeData.color; ctx.lineWidth = strokeData.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; if (strokeData.points.length > 0) { ctx.moveTo(strokeData.points[0].x, strokeData.points[0].y); for (let i = 1; i < strokeData.points.length; i++) { ctx.lineTo(strokeData.points[i].x, strokeData.points[i].y); } } ctx.stroke(); };
+        resizeCanvas = () => { if (!mainApp.classList.contains('hidden')) { const rect = boardContainer.getBoundingClientRect(); drawingCanvas.width = rect.width; drawingCanvas.height = rect.height; renderBoard(); } };
+        getEventPos = (evt) => { const rect = boardContainer.getBoundingClientRect(); const clientX = evt.clientX || evt.touches[0].clientX; const clientY = evt.clientY || evt.touches[0].clientY; return { x: clientX - rect.left - viewState.panX, y: clientY - rect.top - viewState.panY }; };
+        eraseStrokesAt = (pos) => { const r = 15; const f = jamState.frames[jamState.currentFrameIndex]; const d = new Set(); for (const e of f) { if (e.type === 'stroke') for (const p of e.points) if (Math.hypot(p.x - pos.x, p.y - pos.y) < r) { d.add(e.id); break; } } if (d.size > 0) { if (isHost) { recordHistory(); jamState.frames[jamState.currentFrameIndex] = f.filter(e => !d.has(e.id)); renderBoard(); broadcastStateFromHost(); } else { d.forEach(id => sendActionToServer('delete-element', {id})); } } };
+        setActiveTool = (tool) => { activeTool = tool; document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active')); const m = { 'pen': 'tool-pen', 'select': 'tool-select', 'eraser': 'tool-eraser', 'adding-sticky': 'tool-sticky', 'adding-text': 'tool-text', 'adding-sticker': 'tool-sticker' }; document.getElementById(m[tool])?.classList.add('active'); const c = { pen: 'crosshair', eraser: 'cell', 'adding-text': 'text', 'adding-sticky': 'copy', 'adding-sticker': 'copy', select: 'default' }; board.style.cursor = c[tool] || 'default'; boardContainer.style.cursor = (tool === 'select') ? 'grab' : 'default'; drawingCanvas.style.pointerEvents = (tool === 'pen' || tool === 'eraser') ? 'auto' : 'none'; updateContextualToolbar(); };
+        updateContextualToolbar = () => { const o = [penOptions, stickyOptions, textOptions, stickerOptions]; o.forEach(opt => opt.classList.add('hidden')); contextOptionsContainer.classList.add('hidden'); const tm = { pen: penOptions, 'adding-sticky': stickyOptions, 'adding-text': textOptions, 'adding-sticker': stickerOptions }; const e = findElement(selectedElementId); const sm = { 'sticky-note': stickyOptions, 'text-box': textOptions }; const ts = tm[activeTool] || (e ? sm[e.type] : null); if (ts) { ts.classList.remove('hidden'); contextOptionsContainer.classList.remove('hidden'); } };
+        _moveElementForward = (id) => { const f = jamState.frames[jamState.currentFrameIndex]; const i = f.findIndex(el => el.id === id); if (i > -1 && i < f.length - 1) { [f[i], f[i + 1]] = [f[i + 1], f[i]]; } };
+        _moveElementBackward = (id) => { const f = jamState.frames[jamState.currentFrameIndex]; const i = f.findIndex(el => el.id === id); if (i > 0) { [f[i], f[i - 1]] = [f[i - 1], f[i]]; } };
+        updateFrameIndicator = () => { frameBar.classList.remove('hidden'); frameIndicator.textContent = `${jamState.currentFrameIndex + 1} / ${jamState.frames.length}`; };
     </script>
 </body>
 </html>
