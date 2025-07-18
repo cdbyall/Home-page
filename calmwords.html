@@ -82,7 +82,6 @@
 </head>
 <body class="h-screen w-screen flex items-center justify-center p-2">
 
-    <!-- Initial Modals -->
     <div id="initial-modals">
         <div id="name-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
             <div class="modal-content visible bg-white p-8 rounded-lg shadow-xl text-center w-11/12 max-w-sm">
@@ -115,7 +114,6 @@
         </div>
     </div>
 
-    <!-- Main Game App -->
     <div id="main-app" class="hidden h-full w-full max-w-lg mx-auto flex flex-col items-center justify-center gap-4">
         <header class="w-full flex items-center justify-between p-2 bg-white rounded-lg shadow-sm">
             <div>
@@ -126,18 +124,14 @@
         </header>
 
         <div id="game-board" class="grid grid-rows-6 gap-1.5">
-            <!-- Tiles will be generated here -->
-        </div>
+            </div>
 
         <div id="keyboard" class="w-full flex flex-col gap-1.5">
-            <!-- Keyboard will be generated here -->
-        </div>
+            </div>
     </div>
     
-    <!-- Toast Notification -->
     <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-2 rounded-full shadow-lg opacity-0 transition-opacity duration-300"></div>
 
-    <!-- Result Modal -->
     <div id="result-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
         <div class="modal-content bg-white p-8 rounded-lg shadow-xl text-center w-11/12 max-w-sm">
             <h2 id="result-title" class="text-3xl font-bold mb-4"></h2>
@@ -231,6 +225,7 @@
             gameState = {
                 secretWord,
                 grid: Array(GUESS_COUNT).fill().map(() => Array(WORD_LENGTH).fill("")),
+                evaluations: Array(GUESS_COUNT).fill(null), // Holds tile statuses for each row
                 currentRow: 0,
                 currentCol: 0,
                 status: 'playing',
@@ -288,23 +283,22 @@
                     tile.className = 'tile'; // Reset classes
                     if (char) tile.classList.add('filled');
 
-                    if (gameState.currentRow > i) {
-                        const { status } = checkChar(char, j);
+                    if (gameState.evaluations[i]) { // Use pre-calculated evaluations
+                        const status = gameState.evaluations[i][j];
                         tile.classList.add(status);
                     }
                 }
             }
             // Animate current row flip
             if(gameState.status !== 'playing') {
-                 const lastRowIndex = gameState.status === 'won' ? gameState.currentRow : GUESS_COUNT -1;
+                const lastRowIndex = gameState.status === 'won' ? gameState.currentRow - 1 : GUESS_COUNT - 1;
                  const lastRow = gameBoard.children[lastRowIndex];
                  if(lastRow) {
-                    lastRow.childNodes.forEach((tile, index) => {
-                        setTimeout(() => tile.classList.add('flip'), index * 200);
-                    });
+                     lastRow.childNodes.forEach((tile, index) => {
+                         setTimeout(() => tile.classList.add('flip'), index * 200);
+                     });
                  }
             }
-
 
             // Render keyboard
             keyboard.querySelectorAll('.keyboard-key').forEach(keyEl => {
@@ -362,12 +356,22 @@
         }
 
         function processGuess(guess) {
-            // Update keymap
+            const statuses = evaluateGuessStatuses(guess);
+            gameState.evaluations[gameState.currentRow] = statuses;
+            
+            // Update keymap based on the new evaluation
             for (let i = 0; i < WORD_LENGTH; i++) {
-                const { char, status } = checkChar(guess[i], i);
-                const currentStatus = gameState.keyMap[char];
-                if (currentStatus !== 'correct' && (currentStatus !== 'present' || status === 'correct')) {
-                    gameState.keyMap[char] = status;
+                const char = guess[i];
+                const status = statuses[i];
+                const currentKeyStatus = gameState.keyMap[char];
+                
+                // Prioritize statuses: correct > present > absent
+                if (status === 'correct') {
+                    gameState.keyMap[char] = 'correct';
+                } else if (status === 'present' && currentKeyStatus !== 'correct') {
+                    gameState.keyMap[char] = 'present';
+                } else if (status === 'absent' && !currentKeyStatus) {
+                    gameState.keyMap[char] = 'absent';
                 }
             }
             
@@ -384,15 +388,33 @@
             broadcastState();
         }
 
-        function checkChar(char, index) {
+        function evaluateGuessStatuses(guess) {
             const secret = gameState.secretWord;
-            let status = 'absent';
-            if (secret[index] === char) {
-                status = 'correct';
-            } else if (secret.includes(char)) {
-                status = 'present';
+            const statuses = Array(WORD_LENGTH).fill(null);
+            const secretLetters = secret.split('');
+            const guessLetters = guess.split('');
+
+            // First pass for 'correct' letters
+            for (let i = 0; i < WORD_LENGTH; i++) {
+                if (guessLetters[i] === secretLetters[i]) {
+                    statuses[i] = 'correct';
+                    secretLetters[i] = null; // Mark as used
+                }
             }
-            return { char, status };
+
+            // Second pass for 'present' letters
+            for (let i = 0; i < WORD_LENGTH; i++) {
+                if (statuses[i]) continue; // Skip if already marked 'correct'
+
+                const letterIndex = secretLetters.indexOf(guessLetters[i]);
+                if (letterIndex !== -1) {
+                    statuses[i] = 'present';
+                    secretLetters[letterIndex] = null; // Mark as used
+                } else {
+                    statuses[i] = 'absent';
+                }
+            }
+            return statuses;
         }
 
         // --- MAIN SETUP ---
