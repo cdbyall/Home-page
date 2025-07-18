@@ -167,6 +167,28 @@
             transform: scale(1.1);
             box-shadow: 0 0 0 2px white, 0 0 0 4px #4a90e2;
         }
+
+        /* Styles for text editing mode */
+        .joard-element.editing {
+            /* Hide the selection border and sticky note shadow during editing */
+            border-color: transparent !important;
+            box-shadow: none !important;
+        }
+
+        .joard-element.editing .resize-handle,
+        .joard-element.editing .context-btn {
+            /* Hide handles and buttons */
+            visibility: hidden;
+            opacity: 0;
+        }
+
+        .joard-element.editing textarea {
+            /* Add a subtle outline to the active text area */
+            outline: 2px dashed #a0aec0;
+            outline-offset: 2px;
+            border-radius: 0.25rem;
+        }
+
         /* Toast Notification */
         #toast {
             position: fixed;
@@ -447,7 +469,7 @@
         let userName = null;
         let isHost = false;
         let joinMode = 'create'; // 'create' or 'join'
-        let connections = []; // Holds connection objects
+        let connections = []; // Holds connection objects to clients (for host) or to the host (for clients)
         let connectedUsers = []; // Holds user names
         let jamState = {
             frames: [[]], // An array of frames, where each frame is an array of objects
@@ -476,6 +498,8 @@
         let initialElementState = { x: 0, y: 0, width: 0, height: 0 };
         let viewState = { panX: 0, panY: 0 };
         let initialPan = { x: 0, y: 0 };
+        // A temporary element used for client-side dragging visuals before state is confirmed by host
+        let ghostElement = null;
 
         // --- UI UTILITIES ---
         function showToast(message, duration = 3000) {
@@ -486,34 +510,113 @@
             }, duration);
         }
 
-        // --- HISTORY MANAGEMENT ---
+        // --- HISTORY MANAGEMENT (HOST-ONLY) ---
         function recordHistory() {
+            if (!isHost) return;
             history.push(JSON.stringify(jamState));
             redoStack = []; // Clear redo stack on new action
             updateUndoRedoButtons();
         }
 
         function undo() {
+            if (!isHost) return; // Only host can undo/redo the authoritative state
             if (history.length === 0) return;
             redoStack.push(JSON.stringify(jamState));
             jamState = JSON.parse(history.pop());
             renderBoard();
-            broadcastState();
+            broadcastStateFromHost();
             updateUndoRedoButtons();
         }
 
         function redo() {
+            if (!isHost) return;
             if (redoStack.length === 0) return;
             history.push(JSON.stringify(jamState));
             jamState = JSON.parse(redoStack.pop());
             renderBoard();
-            broadcastState();
+            broadcastStateFromHost();
             updateUndoRedoButtons();
         }
 
         function updateUndoRedoButtons() {
-            undoBtn.disabled = history.length === 0;
-            redoBtn.disabled = redoStack.length === 0;
+            // Undo/redo is a host-only feature in this model
+            undoBtn.disabled = !isHost || history.length === 0;
+            redoBtn.disabled = !isHost || redoStack.length === 0;
+        }
+
+        // --- P2P NETWORKING ---
+
+        // Client sends an action to the host
+        function sendActionToServer(actionType, payload) {
+            if (isHost || connections.length === 0) return;
+            const data = { type: 'action', action: actionType, payload: payload };
+            connections[0].send(data);
+        }
+
+        // Host broadcasts its authoritative state to all clients
+        function broadcastStateFromHost() {
+            if (!isHost) return;
+            const data = { type: 'update', state: jamState };
+            connections.forEach(conn => {
+                if (conn.open) conn.send(data);
+            });
+        }
+        
+        // Host processes an action received from a client
+        function processClientAction(action, payload) {
+            if (!isHost) return;
+            
+            // The host will perform the action on behalf of the client
+            recordHistory();
+            
+            let element; // Re-usable element variable
+
+            switch (action) {
+                case 'add-element':
+                    _addElement(payload.type, payload.data);
+                    break;
+                case 'add-stroke':
+                    _addStroke(payload);
+                    break;
+                case 'update-element-content':
+                    element = findElement(payload.id);
+                    if (element) element.content = payload.content;
+                    break;
+                case 'drag-element':
+                    element = findElement(payload.id);
+                    if (element) {
+                        element.x = payload.x;
+                        element.y = payload.y;
+                    }
+                    break;
+                case 'resize-element':
+                     element = findElement(payload.id);
+                    if (element) {
+                        element.width = payload.width;
+                        element.height = payload.height;
+                    }
+                    break;
+                case 'delete-element':
+                    jamState.frames[jamState.currentFrameIndex] = jamState.frames[jamState.currentFrameIndex].filter(el => el.id !== payload.id);
+                    break;
+                case 'layer-element':
+                    if (payload.direction === 'up') {
+                         _moveElementForward(payload.id);
+                    } else {
+                         _moveElementBackward(payload.id);
+                    }
+                    break;
+                case 'switch-frame':
+                    jamState.currentFrameIndex = payload.index;
+                    break;
+                case 'add-frame':
+                    jamState.frames.push([]);
+                    jamState.currentFrameIndex = jamState.frames.length - 1;
+                    break;
+            }
+
+            renderBoard();
+            broadcastStateFromHost();
         }
 
         // --- INITIALIZATION & CONNECTION ---
@@ -570,6 +673,7 @@
 
                 peer.on('open', () => {
                     const conn = peer.connect(peerId, { metadata: { name: userName } });
+                    connections.push(conn); // Client's single connection to the host
                     setupConnection(conn);
                     
                     const connectionTimeout = setTimeout(() => {
@@ -590,39 +694,52 @@
         }
 
         function setupConnection(conn) {
-            conn.on('open', () => {
+            if (isHost) {
+                // Host logic: listen for actions from this client
                 connections.push(conn);
-                
+                conn.on('data', data => {
+                    if (data.type === 'action') {
+                        processClientAction(data.action, data.payload);
+                    }
+                });
+            } else {
+                // Client logic: listen for updates from the host
+                conn.on('data', data => {
+                    if (data.type === 'sync' || data.type === 'update') {
+                        jamState = data.state;
+                        // For clients, received state is the source of truth, so clear local history
+                        history = []; 
+                        redoStack = [];
+                        renderBoard();
+                        updateUndoRedoButtons();
+                        if (data.users) { // Sync message contains user list
+                            connectedUsers = data.users.map(name => ({name}));
+                            updateUsersUI();
+                        }
+                    } else if (data.type === 'user-list') {
+                        connectedUsers = data.users.map(name => ({name}));
+                        updateUsersUI();
+                    }
+                });
+            }
+            
+            conn.on('open', () => {
                 if (isHost) {
                     const newUserName = conn.metadata?.name || 'Anonymous';
                     showToast(`User "${newUserName}" has joined.`);
                     connectedUsers.push({ name: newUserName, id: conn.peer });
                     broadcastUserList();
+                    // Send the full current state to the new user
                     conn.send({ type: 'sync', state: jamState, users: connectedUsers.map(u => u.name) });
                 } else {
+                    // Client has successfully connected to host
                     boardNameModal.classList.add('hidden');
                     mainApp.classList.remove('hidden');
                     leaveBoardBtn.classList.remove('hidden');
                     resizeCanvas();
                 }
             });
-            conn.on('data', data => {
-                if (data.type === 'sync') {
-                    jamState = data.state;
-                    connectedUsers = data.users.map(name => ({name}));
-                    history = [];
-                    redoStack = [];
-                    updateUndoRedoButtons();
-                    renderBoard();
-                    updateUsersUI();
-                } else if (data.type === 'update') {
-                    jamState = data.state;
-                    renderBoard();
-                } else if (data.type === 'user-list') {
-                    connectedUsers = data.users.map(name => ({name}));
-                    updateUsersUI();
-                }
-            });
+            
             conn.on('close', () => {
                 if (isHost) {
                     const remoteUser = connectedUsers.find(u => u.id === conn.peer);
@@ -636,13 +753,6 @@
                 }
             });
         }
-
-        function broadcastState() {
-            const data = { type: 'update', state: jamState };
-            connections.forEach(conn => {
-                if (conn.open) conn.send(data);
-            });
-        }
         
         function broadcastUserList() {
             if (!isHost) return;
@@ -654,12 +764,9 @@
 
         function updateUsersUI() {
             if (!userName) return;
-
             const userNames = connectedUsers.map(u => u.name);
-            
             viewUsersBtn.classList.remove('hidden');
             userCount.textContent = userNames.length;
-
             usersList.innerHTML = '';
             userNames.forEach(name => {
                 const li = document.createElement('li');
@@ -673,9 +780,9 @@
             });
         }
 
-        // --- ELEMENT & DRAWING CREATION ---
-        function addElement(type, data = {}) {
-            recordHistory();
+        // --- ELEMENT & DRAWING CREATION (CORE LOGIC) ---
+        // These "_" functions modify the state directly and are only called by the host.
+        function _addElement(type, data) {
             const newElement = {
                 id: `elem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 type: type,
@@ -687,43 +794,58 @@
 
             if (type === 'sticky-note') {
                 newElement.content = 'Edit me!';
-                newElement.width = 200;
-                newElement.height = 200;
+                newElement.width = 200; newElement.height = 200;
                 newElement.color = data.color || '#fef9c3';
             } else if (type === 'text-box') {
                 newElement.content = '';
-                newElement.width = 200;
-                newElement.height = 60; // Larger initial height
+                newElement.width = 200; newElement.height = 60;
                 newElement.fontFamily = data.fontFamily || 'Inter';
             } else if (type === 'image') {
-                newElement.width = 300;
-                newElement.height = 300;
+                newElement.width = 300; newElement.height = 300;
             } else if (type === 'sticker') {
-                newElement.width = 30;
-                newElement.height = 30;
+                newElement.width = 30; newElement.height = 30;
                 newElement.color = data.color || '#ef4444';
                 newElement.shape = data.shape || 'circle';
             }
-
             jamState.frames[jamState.currentFrameIndex].push(newElement);
-            renderBoard();
-            broadcastState();
             return newElement.id;
         }
 
-        function addStroke() {
-            const currentFrame = jamState.frames[jamState.currentFrameIndex];
-            if (currentPath.length < 2) return;
-            recordHistory();
+        function _addStroke(strokeData) {
             const newStroke = {
                 id: `stroke_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 type: 'stroke',
-                points: currentPath,
-                color: penColor,
-                width: 4
+                points: strokeData.points,
+                color: strokeData.color,
+                width: strokeData.width
             };
-            currentFrame.push(newStroke);
-            broadcastState();
+            jamState.frames[jamState.currentFrameIndex].push(newStroke);
+        }
+
+        // --- ACTION DISPATCHERS ---
+        // These functions are called by user interactions. They decide whether to act locally (host) or send to server (client).
+        function addElement(type, data = {}) {
+            if (isHost) {
+                recordHistory();
+                const newId = _addElement(type, data);
+                renderBoard();
+                broadcastStateFromHost();
+                return newId;
+            } else {
+                sendActionToServer('add-element', { type: type, data: data });
+            }
+        }
+
+        function addStroke() {
+            if (currentPath.length < 2) return;
+            const strokeData = { points: currentPath, color: penColor, width: 4 };
+            if (isHost) {
+                recordHistory();
+                _addStroke(strokeData);
+                broadcastStateFromHost();
+            } else {
+                sendActionToServer('add-stroke', strokeData);
+            }
         }
 
         // --- RENDERING ---
@@ -731,6 +853,10 @@
             const transform = `translate(${viewState.panX}px, ${viewState.panY}px)`;
             board.style.transform = transform;
             drawingCanvas.style.transform = transform;
+        }
+        
+        function findElement(id) {
+            return jamState.frames[jamState.currentFrameIndex].find(el => el.id === id);
         }
 
         function renderBoard() {
@@ -788,7 +914,7 @@
                 svg.innerHTML = stickerShapes[elemData.shape] || stickerShapes.circle;
                 svg.style.fill = elemData.color;
                 elemDiv.appendChild(svg);
-            } else {
+            } else { // This block handles sticky-notes and text-boxes
                 const textArea = document.createElement('textarea');
                 textArea.value = elemData.content;
                 textArea.style.fontFamily = 'inherit';
@@ -796,11 +922,25 @@
                 textArea.disabled = elemData.locked;
                 
                 textArea.addEventListener('input', () => {
-                    const targetElement = jamState.frames[jamState.currentFrameIndex].find(e => e.id === elemData.id);
-                    if (targetElement) {
-                        recordHistory();
-                        targetElement.content = textArea.value;
-                        broadcastState();
+                    if (isHost) {
+                        const targetElement = findElement(elemData.id);
+                        if (targetElement) {
+                            recordHistory();
+                            targetElement.content = textArea.value;
+                            broadcastStateFromHost();
+                        }
+                    }
+                });
+
+                textArea.addEventListener('focus', () => { elemDiv.classList.add('editing'); });
+                textArea.addEventListener('blur', () => {
+                    elemDiv.classList.remove('editing');
+                    // On blur, client sends final content to host
+                    if (!isHost) {
+                        const element = findElement(elemData.id);
+                        if (element && textArea.value !== element.content) {
+                            sendActionToServer('update-element-content', { id: elemData.id, content: textArea.value });
+                        }
                     }
                 });
                 elemDiv.appendChild(textArea);
@@ -809,67 +949,66 @@
             const deleteBtn = document.createElement('div');
             deleteBtn.className = 'context-btn delete-btn';
             deleteBtn.innerHTML = '<i class="fas fa-times fa-xs"></i>';
-            
             const deleteHandler = (e) => {
                 e.stopPropagation();
-                const elem = jamState.frames[jamState.currentFrameIndex].find(el => el.id === elemData.id);
-                if (elem?.locked) {
-                    showToast("Cannot delete a locked item.");
-                    return;
+                if (findElement(elemData.id)?.locked) return;
+                if (isHost) {
+                    recordHistory();
+                    jamState.frames[jamState.currentFrameIndex] = jamState.frames[jamState.currentFrameIndex].filter(el => el.id !== elemData.id);
+                    renderBoard();
+                    broadcastStateFromHost();
+                } else {
+                    sendActionToServer('delete-element', { id: elemData.id });
                 }
-                recordHistory();
-                jamState.frames[jamState.currentFrameIndex] = jamState.frames[jamState.currentFrameIndex].filter(el => el.id !== elemData.id);
                 selectedElementId = null;
-                renderBoard();
-                broadcastState();
                 updateContextualToolbar();
             };
             deleteBtn.addEventListener('mousedown', deleteHandler);
             deleteBtn.addEventListener('touchstart', deleteHandler);
             elemDiv.appendChild(deleteBtn);
 
-            if (isHost) {
+            if (isHost) { // Locking is a host-only privilege
                 const lockBtn = document.createElement('div');
                 lockBtn.className = 'context-btn lock-btn';
                 lockBtn.innerHTML = `<i class="fas ${elemData.locked ? 'fa-lock' : 'fa-lock-open'} fa-xs"></i>`;
-                const lockHandler = (e) => {
+                lockBtn.addEventListener('mousedown', (e) => {
                     e.stopPropagation();
                     recordHistory();
-                    const elem = jamState.frames[jamState.currentFrameIndex].find(el => el.id === elemData.id);
-                    if(elem) {
-                        elem.locked = !elem.locked;
-                    }
+                    const elem = findElement(elemData.id);
+                    if(elem) elem.locked = !elem.locked;
                     renderBoard();
-                    broadcastState();
-                };
-                lockBtn.addEventListener('mousedown', lockHandler);
-                lockBtn.addEventListener('touchstart', lockHandler);
+                    broadcastStateFromHost();
+                });
                 elemDiv.appendChild(lockBtn);
             }
 
             if (!elemData.locked) {
+                const layerHandler = (e, direction) => {
+                    e.stopPropagation();
+                    if (isHost) {
+                        recordHistory();
+                        direction === 'up' ? _moveElementForward(elemData.id) : _moveElementBackward(elemData.id);
+                        renderBoard();
+                        broadcastStateFromHost();
+                    } else {
+                        sendActionToServer('layer-element', { id: elemData.id, direction: direction });
+                    }
+                };
+
                 const layerUpBtn = document.createElement('div');
                 layerUpBtn.className = 'context-btn layer-up-btn';
                 layerUpBtn.innerHTML = '<i class="fas fa-arrow-up fa-xs"></i>';
                 layerUpBtn.title = 'Bring Forward';
-                const layerUpHandler = (e) => {
-                    e.stopPropagation();
-                    moveElementForward(elemData.id);
-                };
-                layerUpBtn.addEventListener('mousedown', layerUpHandler);
-                layerUpBtn.addEventListener('touchstart', layerUpHandler);
+                layerUpBtn.addEventListener('mousedown', (e) => layerHandler(e, 'up'));
+                layerUpBtn.addEventListener('touchstart', (e) => layerHandler(e, 'up'));
                 elemDiv.appendChild(layerUpBtn);
 
                 const layerDownBtn = document.createElement('div');
                 layerDownBtn.className = 'context-btn layer-down-btn';
                 layerDownBtn.innerHTML = '<i class="fas fa-arrow-down fa-xs"></i>';
                 layerDownBtn.title = 'Send Backward';
-                const layerDownHandler = (e) => {
-                    e.stopPropagation();
-                    moveElementBackward(elemData.id);
-                };
-                layerDownBtn.addEventListener('mousedown', layerDownHandler);
-                layerDownBtn.addEventListener('touchstart', layerDownHandler);
+                layerDownBtn.addEventListener('mousedown', (e) => layerHandler(e, 'down'));
+                layerDownBtn.addEventListener('touchstart', (e) => layerHandler(e, 'down'));
                 elemDiv.appendChild(layerDownBtn);
             }
 
@@ -911,7 +1050,6 @@
             const rect = boardContainer.getBoundingClientRect();
             const clientX = evt.clientX || evt.touches[0].clientX;
             const clientY = evt.clientY || evt.touches[0].clientY;
-            // Subtract pan to get world coordinates
             return {
                 x: clientX - rect.left - viewState.panX,
                 y: clientY - rect.top - viewState.panY
@@ -922,399 +1060,284 @@
             const eraserRadius = 15;
             const currentFrame = jamState.frames[jamState.currentFrameIndex];
             const strokesToDelete = new Set();
-
             for (const elem of currentFrame) {
                 if (elem.type === 'stroke') {
                     for (const point of elem.points) {
-                        const distance = Math.hypot(point.x - pos.x, point.y - pos.y);
-                        if (distance < eraserRadius) {
+                        if (Math.hypot(point.x - pos.x, point.y - pos.y) < eraserRadius) {
                             strokesToDelete.add(elem.id);
                             break;
                         }
                     }
                 }
             }
-
             if (strokesToDelete.size > 0) {
-                jamState.frames[jamState.currentFrameIndex] = currentFrame.filter(elem => !strokesToDelete.has(elem.id));
-                renderBoard();
+                 if (isHost) {
+                    recordHistory();
+                    jamState.frames[jamState.currentFrameIndex] = currentFrame.filter(elem => !strokesToDelete.has(elem.id));
+                    renderBoard();
+                    broadcastStateFromHost();
+                 } else {
+                    strokesToDelete.forEach(id => sendActionToServer('delete-element', {id}));
+                 }
             }
         }
 
         function handleMouseDown(e) {
             if (e.target.tagName.toLowerCase() === 'textarea') {
-                e.target.focus();
+                const parentElementDiv = e.target.closest('.joard-element');
+                if (parentElementDiv) {
+                    const elementState = findElement(parentElementDiv.id);
+                    if (elementState?.locked) {
+                        e.target.blur(); return;
+                    }
+                    if (selectedElementId !== parentElementDiv.id) {
+                        selectedElementId = parentElementDiv.id;
+                        renderBoard();
+                    }
+                    setTimeout(() => {
+                        const currentElementDiv = document.getElementById(parentElementDiv.id);
+                        if(currentElementDiv) {
+                            const textArea = currentElementDiv.querySelector('textarea');
+                            if (textArea) {
+                                textArea.focus();
+                                textArea.setSelectionRange(textArea.value.length, textArea.value.length);
+                            }
+                        }
+                    }, 0);
+                }
                 return;
             }
 
             const targetElementDiv = e.target.closest('.joard-element');
-
-            // Pan logic: if select tool is active and click is on the background
             if (activeTool === 'select' && !targetElementDiv && !e.target.closest('.context-btn')) {
                 isPanning = true;
                 boardContainer.style.cursor = 'grabbing';
                 const rect = boardContainer.getBoundingClientRect();
                 const clientX = e.clientX || e.touches[0].clientX;
                 const clientY = e.clientY || e.touches[0].clientY;
-                // Use raw container position for calculating pan delta
                 initialPos = { x: clientX - rect.left, y: clientY - rect.top };
                 initialPan = { ...viewState };
                 return;
             }
 
             const pos = getEventPos(e);
-            const elementState = targetElementDiv ? jamState.frames[jamState.currentFrameIndex].find(el => el.id === targetElementDiv.id) : null;
+            const elementState = targetElementDiv ? findElement(targetElementDiv.id) : null;
 
             if (activeTool === 'pen') {
                 isDrawing = true;
-                currentPath = [pos];
-                return;
+                currentPath = [pos]; return;
             }
-
             if (activeTool === 'eraser') {
-                recordHistory();
                 isErasing = true;
-                eraseStrokesAt(pos);
-                return;
+                eraseStrokesAt(pos); return;
             }
-            
-            if (activeTool === 'adding-sticky') {
-                addElement('sticky-note', { x: pos.x, y: pos.y, color: stickyColor });
-                setActiveTool('select');
+            if (activeTool.startsWith('adding-')) {
+                const typeMap = { 'adding-sticky': 'sticky-note', 'adding-text': 'text-box', 'adding-sticker': 'sticker' };
+                const type = typeMap[activeTool];
+                if (type === 'text-box') {
+                    const newId = addElement(type, { x: pos.x, y: pos.y, fontFamily: textFont, height: 60 });
+                    setActiveTool('select');
+                    selectedElementId = newId;
+                    renderBoard();
+                    setTimeout(() => {
+                        const newElemDiv = document.getElementById(newId);
+                        if (newElemDiv) newElemDiv.querySelector('textarea').focus();
+                    }, 0);
+                } else {
+                    const data = { x: pos.x, y: pos.y };
+                    if (type === 'sticky-note') data.color = stickyColor;
+                    if (type === 'sticker') {
+                        data.color = stickerColor; data.shape = stickerShape; data.x -=15; data.y -=15;
+                    }
+                    addElement(type, data);
+                    if (type !== 'sticker') setActiveTool('select');
+                }
                 return;
-            }
-            
-            if (activeTool === 'adding-text') {
-                const newId = addElement('text-box', { x: pos.x, y: pos.y, fontFamily: textFont, height: 60 });
-                setActiveTool('select');
-                selectedElementId = newId;
-                renderBoard();
-                setTimeout(() => {
-                    const newElemDiv = document.getElementById(newId);
-                    if (newElemDiv) newElemDiv.querySelector('textarea').focus();
-                }, 0);
-                return;
-            }
-            
-            if (activeTool === 'adding-sticker') {
-                addElement('sticker', { x: pos.x - 15, y: pos.y - 15, color: stickerColor, shape: stickerShape });
-                return; // Don't switch tool
             }
 
             const targetHandle = e.target.closest('.resize-handle');
-            
             if (targetHandle && !elementState?.locked) {
-                recordHistory();
                 isResizing = true;
                 selectedElementId = targetHandle.parentElement.id;
-                initialPos = pos;
-                initialElementState = { ...elementState };
-                e.stopPropagation();
-            } else if (targetElementDiv) {
-                selectedElementId = targetElementDiv.id; 
-                if (!elementState?.locked) {
-                    recordHistory();
-                    isDragging = true;
-                    initialPos = pos;
-                    initialElementState = { ...elementState };
-                }
+            } else if (targetElementDiv && !elementState?.locked) {
+                isDragging = true;
+                selectedElementId = targetElementDiv.id;
             } else {
                 selectedElementId = null;
             }
 
+            if (selectedElementId) {
+                initialPos = pos;
+                const currentElementState = findElement(selectedElementId);
+                if (currentElementState) initialElementState = { ...currentElementState };
+                
+                // For client-side responsive dragging, create a 'ghost' element to move
+                if (!isHost && (isDragging || isResizing)) {
+                    ghostElement = document.getElementById(selectedElementId)?.cloneNode(true);
+                    if (ghostElement) {
+                        ghostElement.style.opacity = '0.5';
+                        ghostElement.style.pointerEvents = 'none';
+                        board.appendChild(ghostElement);
+                    }
+                }
+            }
+            
             renderBoard();
             updateContextualToolbar();
         }
 
         function handleMouseMove(e) {
-            // This robust check prevents actions if the mouse button isn't pressed.
             if (e.buttons === 0 && e.touches?.length === 0) {
                 if (isPanning) boardContainer.style.cursor = 'grab';
+                if(ghostElement) ghostElement.remove();
+                ghostElement = null;
                 isDrawing = isDragging = isResizing = isPanning = isErasing = false;
                 return;
             }
 
+            const currentPos = getEventPos(e);
             if (isPanning) {
                 e.preventDefault();
                 const rect = boardContainer.getBoundingClientRect();
                 const clientX = e.clientX || e.touches[0].clientX;
                 const clientY = e.clientY || e.touches[0].clientY;
-                const currentPos = { x: clientX - rect.left, y: clientY - rect.top };
-                const dx = currentPos.x - initialPos.x;
-                const dy = currentPos.y - initialPos.y;
+                const currentScreenPos = { x: clientX - rect.left, y: clientY - rect.top };
+                const dx = currentScreenPos.x - initialPos.x;
+                const dy = currentScreenPos.y - initialPos.y;
                 viewState.panX = initialPan.x + dx;
                 viewState.panY = initialPan.y + dy;
                 applyViewTransform();
                 return;
             }
-            
-            if (isErasing) {
-                e.preventDefault();
-                eraseStrokesAt(getEventPos(e));
-                return;
-            }
-
+            if (isErasing) { e.preventDefault(); eraseStrokesAt(currentPos); return; }
             if (isDrawing) {
                 e.preventDefault();
-                const pos = getEventPos(e);
-                currentPath.push(pos);
+                currentPath.push(currentPos);
                 ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
                 renderBoard();
                 drawStroke({ points: currentPath, color: penColor, width: 4 });
-            } else if (isDragging) {
-                e.preventDefault();
-                const currentPos = getEventPos(e);
+                return;
+            }
+
+            if (isDragging || isResizing) {
+                 e.preventDefault();
                 const dx = currentPos.x - initialPos.x;
                 const dy = currentPos.y - initialPos.y;
-                const elementState = jamState.frames[jamState.currentFrameIndex].find(el => el.id === selectedElementId);
+                const targetEl = isHost ? findElement(selectedElementId) : ghostElement;
+                if (!targetEl) return;
                 
-                // *** FIX: Removed faulty boundary checks to allow free movement ***
-                elementState.x = initialElementState.x + dx;
-                elementState.y = initialElementState.y + dy;
-
-                renderBoard();
-            } else if (isResizing) {
-                e.preventDefault();
-                const currentPos = getEventPos(e);
-                const dx = currentPos.x - initialPos.x;
-                const dy = currentPos.y - initialPos.y;
-                const elementState = jamState.frames[jamState.currentFrameIndex].find(el => el.id === selectedElementId);
-
-                let newWidth = initialElementState.width + dx;
-                let newHeight = initialElementState.height + dy;
-
-                // *** FIX: Removed faulty boundary checks, only enforce a minimum size ***
-                elementState.width = Math.max(50, newWidth);
-                elementState.height = Math.max(20, newHeight);
-
-                renderBoard();
+                if (isDragging) {
+                    targetEl.style.left = `${initialElementState.x + dx}px`;
+                    targetEl.style.top = `${initialElementState.y + dy}px`;
+                } else if (isResizing) {
+                    targetEl.style.width = `${Math.max(50, initialElementState.width + dx)}px`;
+                    targetEl.style.height = `${Math.max(20, initialElementState.height + dy)}px`;
+                }
             }
         }
 
         function handleMouseUp() {
-            if (isDrawing) {
-                addStroke();
-            }
-            if (isErasing) {
-                broadcastState();
-            }
-            if (isPanning) {
-                boardContainer.style.cursor = 'grab';
-            }
+            if (isDrawing) addStroke();
+            if (isErasing && isHost) broadcastStateFromHost();
+
             if (isDragging || isResizing) {
-                broadcastState();
+                const finalPos = getEventPos(event);
+                const dx = finalPos.x - initialPos.x;
+                const dy = finalPos.y - initialPos.y;
+                const finalState = {};
+
+                if (isDragging) {
+                    finalState.x = initialElementState.x + dx;
+                    finalState.y = initialElementState.y + dy;
+                } else if (isResizing) {
+                    finalState.width = Math.max(50, initialElementState.width + dx);
+                    finalState.height = Math.max(20, initialElementState.height + dy);
+                }
+
+                if (isHost) {
+                    recordHistory();
+                    const element = findElement(selectedElementId);
+                    if (element) Object.assign(element, finalState);
+                    renderBoard();
+                    broadcastStateFromHost();
+                } else {
+                    const action = isDragging ? 'drag-element' : 'resize-element';
+                    sendActionToServer(action, { id: selectedElementId, ...finalState });
+                }
             }
-            isDrawing = false;
-            isDragging = false;
-            isResizing = false;
-            isErasing = false;
-            isPanning = false;
-            currentPath = [];
+            if (ghostElement) { ghostElement.remove(); ghostElement = null; }
+            if (isPanning) boardContainer.style.cursor = 'grab';
+            
+            isDrawing = false; isDragging = false; isResizing = false;
+            isErasing = false; isPanning = false; currentPath = [];
         }
         
         // --- UI & TOOL MANAGEMENT ---
         function setActiveTool(tool) {
             activeTool = tool;
             document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-            
-            const btnIdMap = {
-                'pen': 'tool-pen',
-                'select': 'tool-select',
-                'eraser': 'tool-eraser',
-                'adding-sticky': 'tool-sticky',
-                'adding-text': 'tool-text',
-                'adding-sticker': 'tool-sticker'
-            };
+            const btnIdMap = { 'pen': 'tool-pen', 'select': 'tool-select', 'eraser': 'tool-eraser', 'adding-sticky': 'tool-sticky', 'adding-text': 'tool-text', 'adding-sticker': 'tool-sticker' };
             document.getElementById(btnIdMap[tool])?.classList.add('active');
-
-            const cursorMap = {
-                pen: 'crosshair',
-                eraser: 'cell', // A fitting cursor for erasing
-                'adding-text': 'text',
-                'adding-sticky': 'copy',
-                'adding-sticker': 'copy',
-                select: 'default'
-            };
-
+            const cursorMap = { pen: 'crosshair', eraser: 'cell', 'adding-text': 'text', 'adding-sticky': 'copy', 'adding-sticker': 'copy', select: 'default' };
             board.style.cursor = cursorMap[tool] || 'default';
-            // Set container cursor for panning ability
             boardContainer.style.cursor = (tool === 'select') ? 'grab' : 'default';
-            
             drawingCanvas.style.pointerEvents = (tool === 'pen' || tool === 'eraser') ? 'auto' : 'none';
-            
             updateContextualToolbar();
         }
+        function updateContextualToolbar() { /* ... unchanged ... */ }
 
-        function updateContextualToolbar() {
-            const allOptions = [penOptions, stickyOptions, textOptions, stickerOptions];
-            allOptions.forEach(opt => opt.classList.add('hidden'));
-            contextOptionsContainer.classList.add('hidden');
-
-            const toolOptionMap = {
-                pen: penOptions,
-                'adding-sticky': stickyOptions,
-                'adding-text': textOptions,
-                'adding-sticker': stickerOptions
-            };
-
-            const selectedElem = jamState.frames[jamState.currentFrameIndex].find(e => e.id === selectedElementId);
-            const selectedTypeOptionMap = {
-                'sticky-note': stickyOptions,
-                'text-box': textOptions
-            };
-
-            const optionsToShow = toolOptionMap[activeTool] || (selectedElem ? selectedTypeOptionMap[selectedElem.type] : null);
-
-            if (optionsToShow) {
-                optionsToShow.classList.remove('hidden');
-                contextOptionsContainer.classList.remove('hidden');
-            }
-        }
-
-        // --- LAYER MANAGEMENT ---
-        function moveElementForward(elementId) {
-            recordHistory();
+        // --- LAYER MANAGEMENT (CORE LOGIC) ---
+        function _moveElementForward(elementId) {
             const currentFrame = jamState.frames[jamState.currentFrameIndex];
             const index = currentFrame.findIndex(el => el.id === elementId);
             if (index > -1 && index < currentFrame.length - 1) {
                 [currentFrame[index], currentFrame[index + 1]] = [currentFrame[index + 1], currentFrame[index]];
             }
-            renderBoard();
-            broadcastState();
         }
-
-        function moveElementBackward(elementId) {
-            recordHistory();
+        function _moveElementBackward(elementId) {
             const currentFrame = jamState.frames[jamState.currentFrameIndex];
             const index = currentFrame.findIndex(el => el.id === elementId);
             if (index > 0) {
                 [currentFrame[index], currentFrame[index - 1]] = [currentFrame[index - 1], currentFrame[index]];
             }
-            renderBoard();
-            broadcastState();
         }
 
         // --- FRAME MANAGEMENT ---
-        function updateFrameIndicator() {
-            frameBar.classList.remove('hidden');
-            frameIndicator.textContent = `${jamState.currentFrameIndex + 1} / ${jamState.frames.length}`;
+        function switchFrame(index) {
+            if (isHost) {
+                recordHistory();
+                jamState.currentFrameIndex = index;
+                renderBoard();
+                broadcastStateFromHost();
+            } else {
+                sendActionToServer('switch-frame', { index });
+            }
         }
-
         function addFrame() {
-            recordHistory();
-            jamState.frames.push([]);
-            jamState.currentFrameIndex = jamState.frames.length - 1;
-            renderBoard();
-            broadcastState();
-        }
-
-        function nextFrame() {
-            if (jamState.currentFrameIndex < jamState.frames.length - 1) {
-                jamState.currentFrameIndex++;
+            if (isHost) {
+                recordHistory();
+                jamState.frames.push([]);
+                jamState.currentFrameIndex = jamState.frames.length - 1;
                 renderBoard();
-                broadcastState();
+                broadcastStateFromHost();
+            } else {
+                sendActionToServer('add-frame', {});
             }
         }
-
-        function prevFrame() {
-            if (jamState.currentFrameIndex > 0) {
-                jamState.currentFrameIndex--;
-                renderBoard();
-                broadcastState();
-            }
-        }
+        function nextFrame() { if (jamState.currentFrameIndex < jamState.frames.length - 1) { switchFrame(jamState.currentFrameIndex + 1); } }
+        function prevFrame() { if (jamState.currentFrameIndex > 0) { switchFrame(jamState.currentFrameIndex - 1); } }
 
         // --- EVENT LISTENERS ---
-        window.onload = () => {
-            setTimeout(() => {
-                loadingOverlay.classList.add('hidden');
-                setTimeout(() => {
-                    nameModal.classList.remove('hidden');
-                    nameModalContent.classList.add('visible');
-                }, 100);
-            }, 500); // Shorter loading time
-        };
-
-        nameSubmitBtn.addEventListener('click', () => {
-            const name = nameInput.value.trim();
-            if (name) {
-                userName = name;
-                nameModalContent.classList.remove('visible');
-                setTimeout(() => {
-                    nameModal.classList.add('hidden');
-                    actionModal.classList.remove('hidden');
-                    actionModal.querySelector('.modal-content').classList.add('visible');
-                }, 300);
-            } else {
-                showToast("Please enter a name to continue.");
-            }
-        });
-
-        newBoardBtn.addEventListener('click', () => {
-            joinMode = 'create';
-            boardNameTitle.textContent = 'Create a New Board';
-            passwordContainer.classList.remove('hidden');
-            actionModal.querySelector('.modal-content').classList.remove('visible');
-            setTimeout(() => {
-                actionModal.classList.add('hidden');
-                boardNameModal.classList.remove('hidden');
-                boardNameModal.querySelector('.modal-content').classList.add('visible');
-            }, 300);
-        });
-
-        joinBoardBtn.addEventListener('click', () => {
-            joinMode = 'join';
-            boardNameTitle.textContent = 'Join an Existing Board';
-            passwordContainer.classList.remove('hidden');
-            actionModal.querySelector('.modal-content').classList.remove('visible');
-            setTimeout(() => {
-                actionModal.classList.add('hidden');
-                boardNameModal.classList.remove('hidden');
-                boardNameModal.querySelector('.modal-content').classList.add('visible');
-            }, 300);
-        });
-        
-        boardNameBackBtn.addEventListener('click', () => {
-            boardNameModal.querySelector('.modal-content').classList.remove('visible');
-            setTimeout(() => {
-                boardNameModal.classList.add('hidden');
-                actionModal.classList.remove('hidden');
-                actionModal.querySelector('.modal-content').classList.add('visible');
-            }, 300);
-        });
-
+        window.onload = () => { /* ... unchanged ... */ };
+        nameSubmitBtn.addEventListener('click', () => { /* ... unchanged ... */ });
+        newBoardBtn.addEventListener('click', () => { /* ... unchanged ... */ });
+        joinBoardBtn.addEventListener('click', () => { /* ... unchanged ... */ });
+        boardNameBackBtn.addEventListener('click', () => { /* ... unchanged ... */ });
         boardNameSubmitBtn.addEventListener('click', startConnection);
-
-        togglePasswordBtn.addEventListener('click', () => {
-            const isPassword = boardPasswordInput.type === 'password';
-            boardPasswordInput.type = isPassword ? 'text' : 'password';
-            togglePasswordBtn.innerHTML = `<i class="fas ${isPassword ? 'fa-eye-slash' : 'fa-eye'}"></i>`;
-        });
-
-        leaveBoardBtn.addEventListener('click', () => {
-            if (isHost) {
-                leaveModalTitle.textContent = 'End Board for All?';
-                leaveModalText.textContent = 'This will disconnect everyone from the board.';
-                leaveConfirmBtn.textContent = 'End Board';
-            } else {
-                leaveModalTitle.textContent = 'Leave Board?';
-                leaveModalText.textContent = 'Are you sure you want to leave this board?';
-                leaveConfirmBtn.textContent = 'Leave';
-            }
-            leaveModal.classList.remove('hidden');
-            leaveModal.querySelector('.modal-content').classList.add('visible');
-        });
-
-        leaveConfirmBtn.addEventListener('click', () => {
-            if (peer) peer.destroy();
-            window.location.reload();
-        });
-
-        leaveCancelBtn.addEventListener('click', () => {
-            leaveModal.querySelector('.modal-content').classList.remove('visible');
-            setTimeout(() => leaveModal.classList.add('hidden'), 300);
-        });
-
+        togglePasswordBtn.addEventListener('click', () => { /* ... unchanged ... */ });
+        leaveBoardBtn.addEventListener('click', () => { /* ... unchanged ... */ });
+        leaveConfirmBtn.addEventListener('click', () => { if (peer) peer.destroy(); window.location.reload(); });
+        leaveCancelBtn.addEventListener('click', () => { /* ... unchanged ... */ });
         toolStickyBtn.addEventListener('click', () => setActiveTool('adding-sticky'));
         toolTextBtn.addEventListener('click', () => setActiveTool('adding-text'));
         toolStickerBtn.addEventListener('click', () => setActiveTool('adding-sticker'));
@@ -1324,146 +1347,75 @@
         toolEraserBtn.addEventListener('click', () => setActiveTool('eraser'));
         undoBtn.addEventListener('click', undo);
         redoBtn.addEventListener('click', redo);
-        
         addFrameBtn.addEventListener('mousedown', addFrame);
         nextFrameBtn.addEventListener('mousedown', nextFrame);
         prevFrameBtn.addEventListener('mousedown', prevFrame);
-        
         contextOptionsContainer.addEventListener('mousedown', e => e.stopPropagation());
         contextOptionsContainer.addEventListener('touchstart', e => e.stopPropagation());
-
-        penOptions.addEventListener('click', (e) => {
-            if (e.target.matches('.color-btn')) {
-                penColor = e.target.dataset.color;
-                penOptions.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active'));
-                e.target.classList.add('active');
-            }
-        });
-
-        stickyOptions.addEventListener('click', (e) => {
-            if (e.target.matches('.color-btn')) {
-                stickyColor = e.target.dataset.color;
-                stickyOptions.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active'));
-                e.target.classList.add('active');
-                if (selectedElementId) {
-                    const elem = jamState.frames[jamState.currentFrameIndex].find(el => el.id === selectedElementId);
-                    if (elem?.type === 'sticky-note') {
-                        recordHistory();
-                        elem.color = stickyColor;
-                        renderBoard();
-                        broadcastState();
-                    }
-                }
-            }
-        });
-
-        textOptions.addEventListener('click', (e) => {
-            const fontBtn = e.target.closest('.font-btn');
-            if (fontBtn) {
-                textFont = fontBtn.dataset.font;
-                textOptions.querySelectorAll('.font-btn').forEach(btn => btn.classList.remove('active'));
-                fontBtn.classList.add('active');
-                if (selectedElementId) {
-                    const elem = jamState.frames[jamState.currentFrameIndex].find(el => el.id === selectedElementId);
-                    if (elem?.type === 'text-box') {
-                        recordHistory();
-                        elem.fontFamily = textFont;
-                        renderBoard();
-                        broadcastState();
-                    }
-                }
-            }
-        });
-        
-        stickerOptions.addEventListener('click', (e) => {
-            const colorBtn = e.target.closest('.color-btn');
-            const shapeBtn = e.target.closest('.shape-btn');
-            if (colorBtn) {
-                stickerColor = colorBtn.dataset.color;
-                stickerOptions.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active'));
-                colorBtn.classList.add('active');
-            }
-            if (shapeBtn) {
-                stickerShape = shapeBtn.dataset.shape;
-                 stickerOptions.querySelectorAll('.shape-btn').forEach(btn => btn.classList.remove('active'));
-                shapeBtn.classList.add('active');
-            }
-        });
-
+        penOptions.addEventListener('click', (e) => { /* ... unchanged ... */ });
+        stickyOptions.addEventListener('click', (e) => { /* ... unchanged ... */ });
+        textOptions.addEventListener('click', (e) => { /* ... unchanged ... */ });
+        stickerOptions.addEventListener('click', (e) => { /* ... unchanged ... */ });
         imageUploadInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     const dataUrl = event.target.result;
-                    if (dataUrl.length > 500000) { // Limit to ~0.5MB
-                        showToast("Image is too large. Please choose a file under 500KB.", 5000);
-                        return;
-                    }
-                    addElement('image', { src: dataUrl });
+                    if (dataUrl.length > 500000) { showToast("Image is too large (max 500KB).", 5000); return; }
+                    addElement('image', { src: dataUrl, x: 150, y: 150 });
                 };
                 reader.readAsDataURL(file);
             }
             e.target.value = '';
         });
-
-        // Add both mouse and touch listeners for full compatibility
         boardContainer.addEventListener('mousedown', handleMouseDown);
         boardContainer.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mouseup', handleMouseUp);
-        
         boardContainer.addEventListener('touchstart', handleMouseDown, { passive: false });
         boardContainer.addEventListener('touchmove', handleMouseMove, { passive: false });
         window.addEventListener('touchend', handleMouseUp);
-
-
         window.addEventListener('resize', resizeCanvas);
-
         viewUsersBtn.addEventListener('click', () => usersModal.classList.remove('hidden'));
         closeUsersModalBtn.addEventListener('click', () => usersModal.classList.add('hidden'));
-        usersModal.addEventListener('click', e => {
-            if (e.target === usersModal) usersModal.classList.add('hidden');
-        });
-        
-        presentBtn.addEventListener('click', () => {
-            document.body.classList.toggle('presentation-mode');
-            setTimeout(resizeCanvas, 100); 
-        });
-        
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && document.body.classList.contains('presentation-mode')) {
-                document.body.classList.remove('presentation-mode');
-                setTimeout(resizeCanvas, 100);
-            }
-        });
+        usersModal.addEventListener('click', e => { if (e.target === usersModal) usersModal.classList.add('hidden'); });
+        presentBtn.addEventListener('click', () => { /* ... unchanged ... */ });
+        document.addEventListener('keydown', (e) => { /* ... unchanged ... */ });
+        exportBtn.addEventListener('click', () => { /* ... unchanged ... */ });
 
-        exportBtn.addEventListener('click', () => {
-            const previouslySelected = selectedElementId;
-            selectedElementId = null;
-            renderBoard(); // Re-render without selection outlines
-
-            html2canvas(boardContainer, {
-                // Ensure the background and transformed elements are captured correctly
-                backgroundColor: '#eef2f9',
-                onclone: (clonedDoc) => {
-                    // html2canvas clones the DOM. We need to make sure the transforms are applied
-                    // to the clone as they are in the live DOM.
-                    const clonedBoard = clonedDoc.getElementById('board');
-                    const clonedCanvas = clonedDoc.getElementById('drawing-canvas');
-                    clonedBoard.style.transform = board.style.transform;
-                    clonedCanvas.style.transform = drawingCanvas.style.transform;
+        // Unchanged functions that needed to be included for completeness
+        (function() {
+            // Re-pasting unchanged functions here to provide a single code block
+            updateContextualToolbar = function() {
+                const allOptions = [penOptions, stickyOptions, textOptions, stickerOptions];
+                allOptions.forEach(opt => opt.classList.add('hidden'));
+                contextOptionsContainer.classList.add('hidden');
+                const toolOptionMap = { pen: penOptions, 'adding-sticky': stickyOptions, 'adding-text': textOptions, 'adding-sticker': stickerOptions };
+                const selectedElem = findElement(selectedElementId);
+                const selectedTypeOptionMap = { 'sticky-note': stickyOptions, 'text-box': textOptions };
+                const optionsToShow = toolOptionMap[activeTool] || (selectedElem ? selectedTypeOptionMap[selectedElem.type] : null);
+                if (optionsToShow) {
+                    optionsToShow.classList.remove('hidden');
+                    contextOptionsContainer.classList.remove('hidden');
                 }
-            }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = 'bam-joard.png';
-                link.href = canvas.toDataURL();
-                link.click();
+            }
+            window.onload = () => { setTimeout(() => { loadingOverlay.classList.add('hidden'); setTimeout(() => { nameModal.classList.remove('hidden'); nameModalContent.classList.add('visible'); }, 100); }, 500); };
+            nameSubmitBtn.onclick = () => { const name = nameInput.value.trim(); if (name) { userName = name; nameModalContent.classList.remove('visible'); setTimeout(() => { nameModal.classList.add('hidden'); actionModal.classList.remove('hidden'); actionModal.querySelector('.modal-content').classList.add('visible'); }, 300); } else { showToast("Please enter a name to continue."); } };
+            newBoardBtn.onclick = () => { joinMode = 'create'; boardNameTitle.textContent = 'Create a New Board'; passwordContainer.classList.remove('hidden'); actionModal.querySelector('.modal-content').classList.remove('visible'); setTimeout(() => { actionModal.classList.add('hidden'); boardNameModal.classList.remove('hidden'); boardNameModal.querySelector('.modal-content').classList.add('visible'); }, 300); };
+            joinBoardBtn.onclick = () => { joinMode = 'join'; boardNameTitle.textContent = 'Join an Existing Board'; passwordContainer.classList.remove('hidden'); actionModal.querySelector('.modal-content').classList.remove('visible'); setTimeout(() => { actionModal.classList.add('hidden'); boardNameModal.classList.remove('hidden'); boardNameModal.querySelector('.modal-content').classList.add('visible'); }, 300); };
+            boardNameBackBtn.onclick = () => { boardNameModal.querySelector('.modal-content').classList.remove('visible'); setTimeout(() => { boardNameModal.classList.add('hidden'); actionModal.classList.remove('hidden'); actionModal.querySelector('.modal-content').classList.add('visible'); }, 300); };
+            togglePasswordBtn.onclick = () => { const isPassword = boardPasswordInput.type === 'password'; boardPasswordInput.type = isPassword ? 'text' : 'password'; togglePasswordBtn.innerHTML = `<i class="fas ${isPassword ? 'fa-eye-slash' : 'fa-eye'}"></i>`; };
+            leaveBoardBtn.onclick = () => { if (isHost) { leaveModalTitle.textContent = 'End Board for All?'; leaveModalText.textContent = 'This will disconnect everyone from the board.'; leaveConfirmBtn.textContent = 'End Board'; } else { leaveModalTitle.textContent = 'Leave Board?'; leaveModalText.textContent = 'Are you sure you want to leave this board?'; leaveConfirmBtn.textContent = 'Leave'; } leaveModal.classList.remove('hidden'); leaveModal.querySelector('.modal-content').classList.add('visible'); };
+            leaveCancelBtn.onclick = () => { leaveModal.querySelector('.modal-content').classList.remove('visible'); setTimeout(() => leaveModal.classList.add('hidden'), 300); };
+            penOptions.onclick = (e) => { if (e.target.matches('.color-btn')) { penColor = e.target.dataset.color; penOptions.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active')); e.target.classList.add('active'); } };
+            stickyOptions.onclick = (e) => { if (e.target.matches('.color-btn')) { stickyColor = e.target.dataset.color; stickyOptions.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active')); e.target.classList.add('active'); if (selectedElementId && findElement(selectedElementId)?.type === 'sticky-note') { if(isHost){recordHistory(); findElement(selectedElementId).color = stickyColor; renderBoard(); broadcastStateFromHost();} else {sendActionToServer('update-element-color', {id: selectedElementId, color: stickyColor});} } } };
+            textOptions.onclick = (e) => { const fontBtn = e.target.closest('.font-btn'); if (fontBtn) { textFont = fontBtn.dataset.font; textOptions.querySelectorAll('.font-btn').forEach(btn => btn.classList.remove('active')); fontBtn.classList.add('active'); if (selectedElementId && findElement(selectedElementId)?.type === 'text-box') { if(isHost){recordHistory(); findElement(selectedElementId).fontFamily = textFont; renderBoard(); broadcastStateFromHost();} else {sendActionToServer('update-element-font', {id: selectedElementId, font: textFont});} } } };
+            stickerOptions.onclick = (e) => { const colorBtn = e.target.closest('.color-btn'); const shapeBtn = e.target.closest('.shape-btn'); if (colorBtn) { stickerColor = colorBtn.dataset.color; stickerOptions.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active')); colorBtn.classList.add('active'); } if (shapeBtn) { stickerShape = shapeBtn.dataset.shape; stickerOptions.querySelectorAll('.shape-btn').forEach(btn => btn.classList.remove('active')); shapeBtn.classList.add('active'); } };
+            presentBtn.onclick = () => { document.body.classList.toggle('presentation-mode'); setTimeout(resizeCanvas, 100); };
+            document.onkeydown = (e) => { if (e.key === 'Escape' && document.body.classList.contains('presentation-mode')) { document.body.classList.remove('presentation-mode'); setTimeout(resizeCanvas, 100); } };
+            exportBtn.onclick = () => { const previouslySelected = selectedElementId; selectedElementId = null; renderBoard(); html2canvas(boardContainer, { backgroundColor: '#eef2f9', onclone: (clonedDoc) => { const clonedBoard = clonedDoc.getElementById('board'); const clonedCanvas = clonedDoc.getElementById('drawing-canvas'); clonedBoard.style.transform = board.style.transform; clonedCanvas.style.transform = drawingCanvas.style.transform; } }).then(canvas => { const link = document.createElement('a'); link.download = 'bam-joard.png'; link.href = canvas.toDataURL(); link.click(); selectedElementId = previouslySelected; renderBoard(); }); };
+        })();
 
-                // Restore selection
-                selectedElementId = previouslySelected;
-                renderBoard();
-            });
-        });
     </script>
 </body>
 </html>
